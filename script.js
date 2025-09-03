@@ -1,5 +1,5 @@
 // --- Configuration ---
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxIjSr7R7vYuW8dXJR1zPnbCURL_3ALz2mnYr9WebskhPKgbUDCXSBLHM0X4Hiz8_qjpQ/exec";
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzEpkUvHY934dvPlzDXewiLOUPmkxUz8C_4C-LvsUJhxx3PGDnAykMFguJN1HHxhxesbQ/exec";
 const SPREADSHEET_ID = "1tvE1IDZKQLje2K64Et0nQy0jTlOcnLOPma6Ys_ZWciI";
 
 // --- Data containers ---
