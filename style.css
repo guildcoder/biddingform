@@ -1,0 +1,86 @@
+body {
+    font-family: 'Josefin Sans', sans-serif;
+    background-color: #f5f5f5;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+}
+
+.form-container {
+    background-color: #fdf6f0;
+    padding: 30px;
+    margin-top: 20px;
+    border-radius: 15px;
+    width: 500px;
+    box-shadow: 0px 5px 20px rgba(0,0,0,0.1);
+}
+
+.form-group {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+label {
+    font-weight: 700;
+    margin-bottom: 5px;
+    font-size: 18px;
+}
+
+select, input {
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+select:focus, input:focus {
+    outline: none;
+    border-color: #CC0000;
+}
+
+button {
+    background-color: #CC0000;
+    color: white;
+    padding: 15px;
+    font-size: 18px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+button:hover {
+    background-color: #990000;
+}
+
+#saleImage {
+    display: block;
+    max-width: 100%;
+    margin-top: 20px;
+    border-radius: 10px;
+}
+
+.prompt {
+    font-size: 14px;
+    color: #555;
+    margin-top: 5px;
+}
+
+.notification {
+    background-color: #CC0000;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.error-msg {
+    color: red;
+    font-size: 14px;
+    margin-top: 5px;
+}
