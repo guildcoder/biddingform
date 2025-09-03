@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bid Form</title>
+<link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="script.js" defer></script>
+</head>
+<body>
+    <div class="form-container">
+        <div id="notification" class="notification" style="display:none;">Bid submitted!</div>
+
+        <form id="bidForm" onsubmit="event.preventDefault(); submitForm();">
+            <div class="form-group">
+                <label for="saleLot">Sale Lots</label>
+                <select id="saleLot" required>
+                    <option value="" disabled selected>Select a lot</option>
+                </select>
+                <div class="error-msg" id="saleLotError"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="bidderName">Name</label>
+                <input type="text" id="bidderName" placeholder="Enter your name" required>
+                <div class="error-msg" id="nameError"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="biddingNumber">Bidding Number</label>
+                <input type="text" id="biddingNumber" placeholder="Enter your bidding number" required>
+                <div class="error-msg" id="bidNumberError"></div>
+            </div>
+
+            <div class="form-group">
+                <label for="bidAmount">Bid Amount</label>
+                <input type="number" id="bidAmount" min="400" required>
+                <div class="prompt" id="bidPrompt"></div>
+                <div class="error-msg" id="bidError"></div>
+            </div>
+
+            <button type="submit">Submit Bid</button>
+        </form>
+
+        <img id="saleImage" src="" alt="Selected Lot Image" style="display:none;">
+    </div>
+</body>
+</html>
