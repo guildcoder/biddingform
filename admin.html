@@ -3,83 +3,45 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Caprock Livestock Exchange — Admin Console</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Lora&display=swap" rel="stylesheet">
+<title>Caprock — Admin</title>
 <style>
-:root {
-  --primary-bg: #1E293B;
-  --card-bg: #F8F5F0;
-  --accent: #7A2C2C;
-  --text-main: #1E293B;
-  --text-muted: #475569;
-  --glass: rgba(248,245,240,0.05);
-  font-family: 'Lora', serif;
-}
-body {margin:0; background: var(--primary-bg); color: var(--text-main); min-height:100vh;}
-header {padding:24px 32px; display:flex; align-items:center; gap:16px; color: var(--card-bg);}
-header h1 {margin:0; font-family: 'Bebas Neue', sans-serif; font-size:28px;}
-.container {max-width:1200px; margin:20px auto; padding:20px;}
-.card {background: var(--card-bg); padding:16px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.2); margin-bottom:16px;}
-input, select {padding:8px 10px; border-radius:6px; border:1px solid #ccc; width:100%; margin-top:4px;}
-button {padding:8px 14px; border-radius:8px; border:none; cursor:pointer; font-weight:600;}
-button.primary {background: var(--accent); color: var(--card-bg);}
-button.secondary {background: var(--glass); color: var(--text-main); border:1px solid #ccc;}
-table {width:100%; border-collapse: collapse; margin-top:12px;}
-table th, table td {padding:8px; border:1px solid #ccc; text-align:left;}
-table th {background: var(--accent); color: var(--card-bg); font-family: 'Bebas Neue', sans-serif;}
+body{font-family:Inter,system-ui;padding:24px;background:#f3f2ef;color:#041029}
+.card{background:#fff;padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.06);margin-top:12px}
+.input{padding:8px;border-radius:8px;border:1px solid #eaeaea}
+.btn{padding:8px 12px;border-radius:8px;border:0;background:#041029;color:#fff;cursor:pointer}
+.small{font-size:13px;color:#666}
+.table{width:100%;border-collapse:collapse;margin-top:8px}
+.table td,.table th{padding:8px;border-bottom:1px solid #f1f1f1}
 </style>
 </head>
 <body>
-<header>
-  <h1>Caprock Admin Console</h1>
-</header>
-<main class="container">
+<h2>Admin — Entry Codes (requires PIN)</h2>
+<div id="pinArea" class="card">
+  <div class="small">Enter admin PIN to continue.</div>
+  <input id="pin" class="input" placeholder="PIN" />
+  <button id="pinBtn" class="btn">Enter</button>
+  <div id="pinMsg" class="small"></div>
+</div>
 
+<div id="adminUI" style="display:none">
   <div class="card">
-    <h2>Create Seller Entry Code</h2>
-    <div class="formRow">
-      <label>Seller Name</label>
-      <input id="sellerName" placeholder="Seller Name" />
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="sellerId" class="input" placeholder="sellerId (internal id)" />
+      <input id="codeValue" class="input" placeholder="Entry Code (optional random)" />
+      <button id="createCode" class="btn">Create Entry Code</button>
     </div>
-    <div class="formRow">
-      <label>Sale Name</label>
-      <input id="saleName" placeholder="Sale Name" />
-    </div>
-    <div class="formRow">
-      <label>Custom Entry Code</label>
-      <input id="entryCode" placeholder="6-digit code" maxlength="6" />
-    </div>
-    <div class="formRow">
-      <label>Sale Start</label>
-      <input id="saleStart" type="datetime-local" />
-    </div>
-    <div class="formRow">
-      <label>Sale End</label>
-      <input id="saleEnd" type="datetime-local" />
-    </div>
-    <button class="primary" id="createSellerBtn">Create Entry Code</button>
-    <div id="msg" style="margin-top:10px;color:var(--accent);"></div>
+    <div class="small">Entry codes are temporary numbers you can give to sellers so they can access the sale builder.</div>
   </div>
 
   <div class="card">
-    <h2>Existing Sellers & Entry Codes</h2>
-    <table id="sellersTable">
-      <thead>
-        <tr>
-          <th>Seller</th>
-          <th>Sale</th>
-          <th>Entry Code</th>
-          <th>Sale Dates</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <h3>Active Entry Codes</h3>
+    <table class="table" id="codesTable"><thead><tr><th>Code</th><th>SellerId</th><th>Created</th><th>Actions</th></tr></thead><tbody></tbody></table>
   </div>
-</main>
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyCquC_ZsPf59yGnlFLzK8Du1mgibvKOK_M",
@@ -90,49 +52,36 @@ const firebaseConfig = {
   appId: "1:870014358891:web:b74cf577dfd38eff46e82e",
   measurementId: "G-0QWG9DQCLG"
 };
-
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// Create Seller Entry Code
-document.getElementById('createSellerBtn').addEventListener('click', async ()=>{
-  const name = document.getElementById('sellerName').value.trim();
-  const sale = document.getElementById('saleName').value.trim();
-  const code = document.getElementById('entryCode').value.trim();
-  const start = document.getElementById('saleStart').value;
-  const end = document.getElementById('saleEnd').value;
-  if(!name || !sale || !code) {document.getElementById('msg').textContent='Please fill all required fields'; return;}
-  try{
-    const docRef = await db.collection('sellers').doc(code).set({
-      name, saleName: sale, code, start, end, createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-    document.getElementById('msg').textContent = 'Seller entry created!';
-    loadSellers();
-  } catch(e){ console.error(e); document.getElementById('msg').textContent='Error creating entry';}
-});
+document.getElementById('pinBtn').onclick = ()=>{
+  const pin = document.getElementById('pin').value.trim();
+  if(pin === 'KW1912'){ document.getElementById('pinArea').style.display='none'; document.getElementById('adminUI').style.display='block'; loadCodes(); }
+  else document.getElementById('pinMsg').textContent='Wrong PIN.';
+};
 
-// Load sellers
-async function loadSellers(){
-  const tbody = document.querySelector('#sellersTable tbody');
-  tbody.innerHTML='';
-  const snapshot = await db.collection('sellers').orderBy('createdAt','desc').get();
-  snapshot.forEach(doc=>{
-    const data = doc.data();
+document.getElementById('createCode').onclick = async ()=>{
+  const sellerId = document.getElementById('sellerId').value.trim();
+  let code = document.getElementById('codeValue').value.trim();
+  if(!sellerId) return alert('sellerId required');
+  if(!code) code = Math.floor(10000 + Math.random()*89999).toString();
+  await db.collection('entryCodes').add({ sellerId, code, createdAt: new Date().toISOString() });
+  loadCodes();
+};
+
+async function loadCodes(){
+  const tbody = document.querySelector('#codesTable tbody');
+  tbody.innerHTML = '';
+  const snap = await db.collection('entryCodes').orderBy('createdAt','desc').get();
+  snap.forEach(d=>{
+    const r = d.data();
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${data.name}</td><td>${data.saleName}</td><td>${data.code}</td><td>${data.start || 'N/A'} — ${data.end || 'N/A'}</td>
-      <td><button onclick="deleteSeller('${data.code}')">Delete</button></td>`;
+    tr.innerHTML = `<td>${r.code}</td><td>${r.sellerId}</td><td>${r.createdAt}</td><td><button data-id="${d.id}" class="del">Delete</button></td>`;
     tbody.appendChild(tr);
   });
+  document.querySelectorAll('.del').forEach(b=>b.onclick = async (e)=>{ if(confirm('Delete?')){ await db.collection('entryCodes').doc(e.target.dataset.id).delete(); loadCodes(); } });
 }
-
-async function deleteSeller(code){
-  if(confirm('Delete this seller?')){
-    await db.collection('sellers').doc(code).delete();
-    loadSellers();
-  }
-}
-
-loadSellers();
 </script>
 </body>
 </html>
