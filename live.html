@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Caprock Livestock Exchange — Live Bidding</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0f1724;--card:#0b1320;--muted:#94a3b8;--accent:#0ea5a4;font-family:Inter,system-ui;}
+    body{margin:0;background:linear-gradient(180deg,#061226 0%, #071427 60%);color:#e6eef6;min-height:100vh}
+    .container{max-width:1100px;margin:18px auto;padding:18px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
+    .lot-card img{width:100%;height:180px;object-fit:cover;border-radius:8px}
+    input,button{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    .btn{background:var(--accent);border:none;padding:8px 10px;border-radius:8px;color:#042826;cursor:pointer}
+    .small{color:var(--muted);font-size:13px}
+    @media (max-width:900px){.grid{grid-template-columns:repeat(3,1fr)}} @media (max-width:600px){.grid{grid-template-columns:repeat(2,1fr)}} @media (max-width:420px){.grid{grid-template-columns:repeat(1,1fr)}}
+  </style>
+</head>
+<body>
+  <main class="container">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <h1 id="headerTitle">Live Bidding</h1>
+        <div id="saleMeta" class="small">Loading sale...</div>
+      </div>
+      <div>
+        <button id="getBidNumBtn" class="btn">Get Bidding Number</button>
+      </div>
+    </div>
+
+    <div id="bidRegistration" class="card" style="display:none;margin-top:12px">
+      <h3>Register to Bid</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="regName" placeholder="Your name" />
+        <input id="regPhone" placeholder="Phone (10 digits)" />
+        <input id="regEmail" placeholder="Email (optional)" />
+        <button id="registerBtn" class="btn">Register</button>
+      </div>
+      <div id="regMsg" class="small" style="margin-top:8px"></div>
+    </div>
+
+    <div id="lotsGrid" class="grid" style="margin-top:12px"></div>
+  </main>
+
+  <!-- Bid modal -->
+  <div id="bidModal" style="display:none;position:fixed;inset:0;background:rgba(2,6,23,.7);align-items:center;justify-content:center">
+    <div style="background:#071427;padding:16px;border-radius:12px;width:420px;max-width:95%">
+      <h3 id="bidModalTitle">Place Bid</h3>
+      <div id="bidLotPreview" class="small" style="margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px">
+        <input id="bidPhonePartial" placeholder="Last 4 of phone" maxlength="4" />
+        <input id="bidNumber" placeholder="Bidding number" maxlength="5" />
+      </div>
+      <div style="margin-top:8px">
+        <label class="small">Amount (must follow increment)</label>
+        <input id="bidAmount" type="number" />
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+        <button id="confirmBidBtn" class="btn">Submit</button>
+        <button id="cancelBidBtn" class="btn" style="background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)">Cancel</button>
+      </div>
+      <div id="bidMsg" class="small" style="margin-top:8px;color:#ffd1a8"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+    import {
+      getFirestore, collection, doc, getDoc, onSnapshot, query, orderBy, addDoc, serverTimestamp, runTransaction
+    } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCquC_ZsPf59yGnlFLzK8Du1mgibvKOK_M",
+      authDomain: "biddingapp-a6d8e.firebaseapp.com",
+      projectId: "biddingapp-a6d8e",
+      storageBucket: "biddingapp-a6d8e.firebasestorage.app",
+      messagingSenderId: "870014358891",
+      appId: "1:870014358891:web:b74cf577dfd38eff46e82e",
+      measurementId: "G-0QWG9DQCLG"
+    };
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Helpers
+    const $ = id => document.getElementById(id);
+    const uid = (n=5) => Math.random().toString(36).slice(2,2+n).toUpperCase();
+
+    // parse query param "live"
+    const params = new URLSearchParams(location.search);
+    const SALE_ID = params.get('live') || 'DEMO';
+    const PREVIEW_LOT = params.get('previewLot') || null;
+
+    // state caches
+    let SALE = null;
+    let LOTS = {}; // id -> data
+    let myBidNumber = localStorage.getItem(`caprock_bidnum_${SALE_ID}`) || null;
+
+    // show registration panel if no bid number
+    function showRegistration(flag){ $('bidRegistration').style.display = flag ? 'block' : 'none'; }
+
+    async function init(){
+      if(SALE_ID === 'DEMO'){
+        // local demo: create sample lots
+        SALE = { business:'Caprock Ranch', saleName:'Demo Sale', status:'live' };
+        $('headerTitle').textContent = SALE.saleName;
+        $('saleMeta').textContent = SALE.business + ' — demo';
+        LOTS = {};
+        for(let i=1;i<=6;i++){
+          const id = 'demoLot'+i;
+          LOTS[id] = { id, ear:'Lot '+i, breed:'Angus', pedigree:'Sire x Dam', imageUrl:'https://picsum.photos/seed/lot'+i+'/800/600', start:100, increment:50, currentBid:0, currentBidder:''};
+        }
+        renderLots();
+        return;
+      }
+
+      // listen sale meta
+      const saleRef = doc(db,'sales',SALE_ID);
+      const saleSnap = await getDoc(saleRef);
+      if(!saleSnap.exists()){ $('saleMeta').textContent = 'Sale not found'; return; }
+      SALE = saleSnap.data();
+      $('headerTitle').textContent = SALE.saleName || 'Live Bidding';
+      $('saleMeta').textContent = `${SALE.business || ''} — status: ${SALE.status || 'draft'}`;
+
+      // listen lots
+      const q = query(collection(db,'sales',SALE_ID,'lots'), orderBy('createdAt','asc'));
+      onSnapshot(q, snap => {
+        LOTS = {};
+        snap.forEach(d => LOTS[d.id] = { id:d.id, ...d.data() });
+        renderLots();
+      });
+    }
+
+    function renderLots(){
+      const grid = $('lotsGrid'); grid.innerHTML='';
+      Object.values(LOTS).forEach(lot => {
+        const card = document.createElement('div'); card.className='card lot-card';
+        card.innerHTML = `
+          <h3 style="margin:8px 0">${lot.ear} <small class="small">${lot.breed || ''}</small></h3>
+          <img src="${lot.imageUrl || 'https://picsum.photos/seed/'+(lot.id||'x')+'/800/600'}" alt="lot photo" onclick="openImg(this.src)">
+          <p class="small" style="margin:8px 0">${lot.pedigree || ''}</p>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><small>Current</small><div><strong>${lot.currentBid && lot.currentBid>0 ? '$'+Number(lot.currentBid).toFixed(2) : 'Starting $'+(lot.start||0).toFixed(2)}</strong></div></div>
+            <div><button class="btn" onclick="bidOnLot('${lot.id}')">Bid on me!</button></div>
+          </div>`;
+        grid.appendChild(card);
+      });
+      // if previewLot specified, open its bid modal
+      if(PREVIEW_LOT && LOTS[PREVIEW_LOT]) setTimeout(()=>bidOnLot(PREVIEW_LOT),250);
+    }
+
+    // expose small helpers for image open
+    window.openImg = function(src){
+      const w = window.open('','_blank');
+      w.document.write(`<img src="${src}" style="max-width:100%;height:auto;display:block;margin:20px auto;background:#000;padding:10px">`);
+    };
+
+    // registration flow: create bidder doc and assign 5-digit number
+    $('getBidNumBtn').addEventListener('click', ()=>{ showRegistration(true); window.scrollTo({top:0,behavior:'smooth'}); });
+    $('registerBtn').addEventListener('click', async ()=>{
+      const name = $('regName').value.trim();
+      const phone = $('regPhone').value.replace(/\D/g,''); // digits only
+      const email = $('regEmail').value.trim();
+      if(!name || phone.length < 10){ $('regMsg').textContent = 'Enter name and full 10-digit phone number.'; return; }
+      // generate a unique 5-digit number (not guaranteed unique but we will attempt and retry)
+      let bidderNumber = Math.floor(10000 + Math.random()*90000).toString();
+      // store bidder in sales/{SALE_ID}/bidders with field bidderNumber
+      try{
+        const bidsCol = collection(db,'sales',SALE_ID,'bidders');
+        // We don't check uniqueness of number for simplicity — in production you'd enforce uniqueness or map seller-visible number differently.
+        const docRef = await addDoc(bidsCol, { name, phone, email, bidderNumber, createdAt: serverTimestamp() });
+        myBidNumber = bidderNumber;
+        localStorage.setItem(`caprock_bidnum_${SALE_ID}`, myBidNumber);
+        $('regMsg').textContent = `Your bidding number: ${myBidNumber}. Use it to place bids (store it securely).`;
+        showRegistration(false);
+      }catch(err){ console.error(err); $('regMsg').textContent = 'Error registering — try again.'; }
+    });
+
+    // bidding modal
+    window.bidOnLot = function(lotId){
+      const lot = LOTS[lotId];
+      if(!lot) return alert('Lot not found yet');
+      $('bidModal').style.display = 'flex';
+      $('bidModalTitle').textContent = `Bid — ${lot.ear}`;
+      $('bidLotPreview').innerHTML = `<div><small>${lot.pedigree || ''}</small></div><div class="small">Current: ${(lot.currentBid && lot.currentBid>0)?'$'+Number(lot.currentBid).toFixed(2):'Starting $'+(lot.start||0).toFixed(2)}</div>`;
+      // prefill amount
+      const min = (lot.currentBid && lot.currentBid>0) ? (lot.currentBid + lot.increment) : Math.max(lot.start || 0, lot.increment || 1);
+      $('bidAmount').value = min;
+      $('bidAmount').dataset.lotId = lotId;
+      $('bidNumber').value = myBidNumber || '';
+      $('bidPhonePartial').value = localStorage.getItem(`caprock_phone_last4_${SALE_ID}`) || '';
+      $('bidMsg').textContent = '';
+    };
+
+    $('cancelBidBtn').addEventListener('click', ()=>{ $('bidModal').style.display='none'; });
+    $('confirmBidBtn').addEventListener('click', async ()=>{
+      const lotId = $('bidAmount').dataset.lotId;
+      const amount = parseFloat($('bidAmount').value) || 0;
+      const bidderNumber = $('bidNumber').value.trim();
+      const phoneLast4 = $('bidPhonePartial').value.trim();
+
+      if(!lotId) return;
+      if(!bidderNumber){ $('bidMsg').textContent = 'Enter your bidding number.'; return; }
+      const lotRef = doc(db,'sales',SALE_ID,'lots',lotId);
+
+      try{
+        // perform transaction: verify current bid and apply update safely
+        await runTransaction(db, async (tx) => {
+          const snap = await tx.get(lotRef);
+          if(!snap.exists()) throw 'Lot missing';
+          const data = snap.data();
+          const current = data.currentBid && data.currentBid>0 ? Number(data.currentBid) : Number(data.start || 0);
+          const inc = Number(data.increment || 1);
+          const min = (data.currentBid && data.currentBid>0) ? (Number(data.currentBid) + inc) : Math.max(Number(data.start || 0), inc);
+          if(amount < min) throw `Bid must be at least $${min}`;
+          // enforce increments: (amount - base) must be multiple of inc
+          const base = (data.currentBid && data.currentBid>0) ? Number(data.currentBid) : Number(data.start || 0);
+          if( ((amount - base) % inc) !== 0 ) throw `Bid amount must be in increments of $${inc}`;
+          // everything okay: write new bid into subcollection and update currentBid & currentBidder on lot
+          const bidsColRef = collection(db,'sales',SALE_ID,'lots',lotId,'bids');
+          tx.set(doc(bidsColRef, `${Date.now()}_${Math.random().toString(36).slice(2,6)}`), {
+            amount, bidderNumber, phoneLast4, createdAt: serverTimestamp()
+          });
+          tx.update(lotRef, { currentBid: amount, currentBidder: bidderNumber });
+        });
+
+        // store last4 locally for convenience (so bidder can prefill next time if needed)
+        localStorage.setItem(`caprock_phone_last4_${SALE_ID}`, phoneLast4);
+        $('bidMsg').style.color = '#b9ffd1';
+        $('bidMsg').textContent = 'Bid accepted!';
+        $('bidModal').style.display = 'none';
+      }catch(err){
+        console.error('bid error',err);
+        $('bidMsg').style.color = '#ffd1a8';
+        $('bidMsg').textContent = typeof err === 'string' ? err : 'Error submitting bid — try again';
+      }
+    });
+
+    // initial
+    init();
+  </script>
+</body>
+</html>
