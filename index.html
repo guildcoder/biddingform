@@ -1,48 +1,534 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Bid Form</title>
-<link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
-<script src="script.js" defer></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Caprock Livestock Exchange — Bidding App (Prototype)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1320; --muted:#94a3b8; --accent:#0ea5a4; --glass: rgba(255,255,255,0.03);
+      --glass-2: rgba(255,255,255,0.02);
+      font-family: 'Inter',system-ui,Helvetica,Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#061226 0%, #071427 60%);color:#e6eef6;min-height:100vh}
+    header{padding:28px 32px;display:flex;align-items:center;gap:18px}
+    h1{margin:0;font-weight:800;letter-spacing:-0.4px}
+    .container{max-width:1100px;margin:18px auto;padding:18px}
+
+    /* Entry gate */
+    #entryGate{display:flex;align-items:center;justify-content:center;height:72vh}
+    .gateCard{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:14px;padding:28px;width:520px;box-shadow:0 6px 30px rgba(2,6,23,0.6);border:1px solid rgba(255,255,255,0.03)}
+    .gateCard input{width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;margin-top:12px}
+    .btn{background:var(--accent);border:none;padding:10px 14px;border-radius:10px;font-weight:600;color:#042826;cursor:pointer}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+
+    /* Dashboard */
+    .dashboard{display:none}
+    .controls{display:flex;gap:12px;align-items:center;margin-bottom:14px}
+    .controls .big{padding:12px 18px;font-size:16px}
+    .controls button{border-radius:10px;padding:8px 12px;border:1px solid rgba(255,255,255,0.04);background:var(--glass)}
+    .controls button:hover{transform:translateY(-2px)}
+    .infoNote{background:var(--glass-2);padding:10px;border-radius:8px;color:var(--muted);font-size:13px}
+
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+    .card img{width:100%;height:140px;object-fit:cover;border-radius:8px}
+    .card h3{margin:8px 0 2px;font-size:14px}
+    .card p{margin:0;color:var(--muted);font-size:13px}
+    .lottable{display:flex;justify-content:space-between;margin-top:10px}
+    .lottable small{display:block}
+
+    /* Form */
+    .formRow{display:flex;gap:10px;margin-bottom:10px}
+    .formRow > *{flex:1}
+    label{font-size:13px;color:var(--muted)}
+    input[type=file]{color:var(--muted)}
+
+    /* Modal */
+    .modalBackdrop{position:fixed;inset:0;background:rgba(2,6,23,0.6);display:none;align-items:center;justify-content:center}
+    .modal{background:#071427;padding:18px;border-radius:12px;max-width:720px;width:96%;}
+
+    /* responsive */
+    @media (max-width:1000px){.grid{grid-template-columns:repeat(3,1fr)}.container{padding:14px}}
+    @media (max-width:700px){.grid{grid-template-columns:repeat(2,1fr)}header{flex-direction:column;align-items:flex-start} }
+    @media (max-width:420px){.grid{grid-template-columns:repeat(1,1fr)}}
+
+    /* tiny tooltip-like hover tag using title attribute fallback */
+    .btn[data-tip]:hover::after{content:attr(data-tip);position:absolute;background:#071427;padding:6px 10px;border-radius:8px;font-size:12px;color:var(--muted);transform:translateY(-10px);}
+  </style>
 </head>
 <body>
-    <div class="form-container">
-        <div id="notification" class="notification" style="display:none;">Bid submitted!</div>
-
-        <form id="bidForm" onsubmit="event.preventDefault(); submitForm();">
-            <div class="form-group">
-                <label for="saleLot">Sale Lots</label>
-                <select id="saleLot" required>
-                    <option value="" disabled selected>Select a lot</option>
-                </select>
-                <div class="error-msg" id="saleLotError"></div>
-            </div>
-
-            <div class="form-group">
-                <label for="bidderName">Name</label>
-                <input type="text" id="bidderName" placeholder="Enter your name" required>
-                <div class="error-msg" id="nameError"></div>
-            </div>
-
-            <div class="form-group">
-                <label for="biddingNumber">Bidding Number</label>
-                <input type="text" id="biddingNumber" placeholder="Enter your bidding number" required>
-                <div class="error-msg" id="bidNumberError"></div>
-            </div>
-
-            <div class="form-group">
-                <label for="bidAmount">Bid Amount</label>
-                <input type="number" id="bidAmount" min="400" required>
-                <div class="prompt" id="bidPrompt"></div>
-                <div class="error-msg" id="bidError"></div>
-            </div>
-
-            <button type="submit">Submit Bid</button>
-        </form>
-
-        <img id="saleImage" src="" alt="Selected Lot Image" style="display:none;">
+  <header>
+    <img src="" alt="logo" style="width:56px;height:56px;border-radius:10px;background:linear-gradient(90deg,var(--accent),#62d0ce)">
+    <div>
+      <h1>Caprock Livestock Exchange — Bidding App</h1>
+      <div style="color:var(--muted);font-size:13px">Seller Dashboard & Live Bid Board (prototype)</div>
     </div>
+  </header>
+
+  <main class="container">
+
+    <!-- Entry Gate -->
+    <section id="entryGate">
+      <div class="gateCard">
+        <h2 style="margin:0">Enter your Bidding Entry Number</h2>
+        <p style="color:var(--muted);margin:8px 0 0;font-size:13px">Only users who have been given an entry number can create/manage a sale.</p>
+        <input id="entryCode" placeholder="Enter 6-digit entry code" />
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn" id="unlockBtn">Unlock</button>
+          <button class="btn ghost" id="demoBtn">Use Demo Sale</button>
+        </div>
+        <p id="gateError" style="color:#ff8a8a;margin-top:8px;display:none">Invalid code — ask seller for a valid entry number.</p>
+      </div>
+    </section>
+
+    <!-- Dashboard (hidden until valid code) -->
+    <section class="dashboard" id="dashboard">
+
+      <!-- Brief form for seller to create sale settings -->
+      <div style="background:var(--card);padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)">
+        <h2 style="margin:0 0 10px 0">Create / Edit Sale</h2>
+        <div class="formRow">
+          <div>
+            <label>Business Name</label>
+            <input id="businessName" placeholder="e.g. Caprock Ranch Co." />
+          </div>
+          <div>
+            <label>Sale Name</label>
+            <input id="saleName" placeholder="e.g. October Fall Dispersal" />
+          </div>
+        </div>
+        <div class="formRow">
+          <div>
+            <label>Logo (optional)</label>
+            <input id="logoFile" type="file" accept="image/*" />
+          </div>
+          <div>
+            <label>Sale Description (optional)</label>
+            <input id="saleDesc" placeholder="Short sentence about the sale" />
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;margin-top:10px">
+          <div style="flex:1">
+            <label>Number of Lots</label>
+            <input id="numLots" type="number" min="1" value="6" />
+          </div>
+          <div style="flex:1">
+            <label>All lots same opening price & increment?</label>
+            <select id="globalPricing"><option value="yes">Yes</option><option value="no">No</option></select>
+          </div>
+          <div style="flex:1">
+            <label>Opening Price (if same)</label>
+            <input id="globalStart" type="number" min="0" value="100" />
+          </div>
+          <div style="flex:1">
+            <label>Increment (if same)</label>
+            <input id="globalIncrement" type="number" min="1" value="50" />
+          </div>
+        </div>
+
+        <div class="formRow" style="margin-top:10px">
+          <div>
+            <label>Sale Start (local time)</label>
+            <input id="startDate" type="datetime-local" />
+          </div>
+          <div>
+            <label>Sale End (local time)</label>
+            <input id="endDate" type="datetime-local" />
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+          <button class="btn" id="createLots">Create Lots</button>
+          <button class="btn ghost" id="saveSale">Save Sale</button>
+          <div style="margin-left:auto;color:var(--muted);font-size:13px">Sale will automatically begin & end at your selected date & times.</div>
+        </div>
+      </div>
+
+      <!-- Control panel -->
+      <div style="margin-top:14px;display:flex;align-items:center;gap:12px">
+        <div class="controls">
+          <button id="startSale" data-tip="Open the sale to live bidders">Start Sale</button>
+          <button id="pauseSale" data-tip="Temporarily pause bidding">Temporarily Pause Sale</button>
+          <button id="endSale" data-tip="Close the sale">End Sale</button>
+          <button id="exportAll" data-tip="Download CSV of all bids">Export All Bids</button>
+          <button id="exportWinners" data-tip="Download CSV of current winners">Export Winning Bids</button>
+          <button id="shareLive" class="big" style="background:linear-gradient(90deg,var(--accent),#62d0ce);border:none;color:#042826;padding:12px 18px;border-radius:12px" data-tip="Copy live bidding site link">Share Live Bidding Site</button>
+        </div>
+        <div style="flex:1;text-align:right;color:var(--muted)"><small id="saleTimes">No sale selected</small></div>
+      </div>
+
+      <!-- Grid of lots -->
+      <div id="lotsGrid" class="grid" style="margin-top:16px">
+        <!-- cards will be injected here -->
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Modal for adding/editing a lot -->
+  <div class="modalBackdrop" id="modalBackdrop">
+    <div class="modal" role="dialog" aria-modal="true">
+      <h3 id="modalTitle">Create Lot</h3>
+      <div class="formRow">
+        <div>
+          <label>Lot # / Ear Notch</label>
+          <input id="lotEar" />
+        </div>
+        <div>
+          <label>Breed</label>
+          <input id="lotBreed" />
+        </div>
+      </div>
+      <div class="formRow">
+        <div>
+          <label>Pedigree</label>
+          <input id="lotPedigree" />
+        </div>
+        <div>
+          <label>Photo</label>
+          <input id="lotPhoto" type="file" accept="image/*" />
+        </div>
+      </div>
+      <div class="formRow">
+        <div>
+          <label>Starting Bid</label>
+          <input id="lotStart" type="number" min="0" />
+        </div>
+        <div>
+          <label>Increment</label>
+          <input id="lotIncrement" type="number" min="1" />
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn" id="saveLotBtn">Save Lot</button>
+        <button class="btn ghost" id="cancelLotBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bid modal shown to bidders on live site (also used in seller preview) -->
+  <div class="modalBackdrop" id="bidBackdrop">
+    <div class="modal" id="bidModal">
+      <h3 id="bidModalTitle">Place Bid</h3>
+      <div id="bidPreview" style="margin-bottom:8px"></div>
+      <div class="formRow">
+        <div>
+          <label>Last 4 of phone</label>
+          <input id="bidPhone" maxlength="4" />
+        </div>
+        <div>
+          <label>Bidding Number</label>
+          <input id="bidNumber" maxlength="5" />
+        </div>
+      </div>
+      <div style="margin-top:8px;">
+        <label>Amount (must follow increment)</label>
+        <input id="bidAmount" type="number" />
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn" id="submitBidBtn">Submit Bid</button>
+        <button class="btn ghost" id="cancelBidBtn">Cancel</button>
+      </div>
+      <div id="bidMsg" style="color:#ffd1a8;margin-top:8px"></div>
+    </div>
+  </div>
+
+  <script>
+    // --------------------------
+    // === FIREBASE PLACEHOLDERS ===
+    // Replace with your Firebase config and uncomment initialization below
+    // --------------------------
+    const firebaseConfig = {
+      // apiKey: "YOUR_API_KEY",
+      // authDomain: "YOUR_AUTH_DOMAIN",
+      // projectId: "YOUR_PROJECT_ID",
+      // storageBucket: "YOUR_STORAGE_BUCKET",
+      // messagingSenderId: "...",
+      // appId: "..."
+    };
+
+    // Example Firestore structure (recommended):
+    // collections: sales (document per saleId) -> {meta}
+    // sales/{saleId}/lots/{lotId} -> {ear,breed,pedigree,photoUrl,start,increment,currentBid,currentBidder}
+    // sales/{saleId}/bidders/{bidderId} -> {name,phone,email}
+    // sales/{saleId}/bids/{bidId} -> {lotId,amount,bidderId,ts}
+
+    // For now we'll store data in-memory for the demo. Replace functions below with Firestore calls.
+
+    // --------------------------
+    // Demo in-memory store (replace with firebase reads/writes)
+    // --------------------------
+    let DEMO = {
+      saleId: null,
+      meta: {},
+      lots: {},
+      bidders: {},
+      bids: {}
+    };
+
+    // --------------------------
+    // Utils
+    // --------------------------
+    function uid(n=6){return Math.random().toString(36).slice(2,2+n)}
+    function formatDateRange(start,end){
+      if(!start || !end) return 'No dates set';
+      const s=new Date(start); const e=new Date(end);
+      return `Sale Date (${(s.getMonth()+1).toString().padStart(2,'0')}/${s.getDate().toString().padStart(2,'0')}/${s.getFullYear()} at ${s.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} ${Intl.DateTimeFormat().resolvedOptions().timeZone} thru ${(e.getMonth()+1).toString().padStart(2,'0')}/${e.getDate().toString().padStart(2,'0')}/${e.getFullYear()} at ${e.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} ${Intl.DateTimeFormat().resolvedOptions().timeZone})`;
+    }
+
+    function csvFromArray(rows){
+      return rows.map(r => r.map(cell => '"'+String(cell).replace(/"/g,'""')+'"').join(',')).join('\n');
+    }
+
+    function downloadBlob(filename, text){
+      const blob = new Blob([text], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),5000);
+    }
+
+    // --------------------------
+    // UI wiring
+    // --------------------------
+    const entryGate = document.getElementById('entryGate');
+    const dashboard = document.getElementById('dashboard');
+    const unlockBtn = document.getElementById('unlockBtn');
+    const demoBtn = document.getElementById('demoBtn');
+    const gateError = document.getElementById('gateError');
+
+    unlockBtn.addEventListener('click', ()=>{
+      const code = document.getElementById('entryCode').value.trim();
+      // TODO: validate with firebase; for now accept 'ABC123' or 6-digit number
+      if(code === 'ABC123' || /^\d{6}$/.test(code)){
+        gateError.style.display = 'none';
+        openDashboard(code);
+      } else {
+        gateError.style.display = 'block';
+      }
+    });
+
+    demoBtn.addEventListener('click', ()=>openDashboard('DEMO'));
+
+    function openDashboard(code){
+      entryGate.style.display = 'none';
+      dashboard.style.display = 'block';
+      // load sale by code (demo)
+      if(code === 'DEMO') loadDemoSale();
+      else loadSaleByEntry(code);
+    }
+
+    function loadSaleByEntry(code){
+      // In production: lookup sale doc by entry code.
+      // For now create a placeholder sale
+      DEMO.saleId = 'sale_' + uid(6);
+      DEMO.meta = {business:'(unknown)', saleName:'(untitled)', start:null,end:null,entryCode:code};
+      renderSaleMeta();
+    }
+
+    function loadDemoSale(){
+      DEMO.saleId = 'demo';
+      DEMO.meta = {business:'Caprock Ranch Co.', saleName:'Demo Fall Sale', start:new Date().toISOString(), end:new Date(Date.now()+1000*60*60*24).toISOString(),entryCode:'DEMO'};
+      // create a few demo lots
+      for(let i=1;i<=6;i++){
+        const id = 'lot'+i;
+        DEMO.lots[id] = {id,ear:'Lot '+i,breed:'Angus',pedigree:'Sire x Dam',photoUrl:'https://picsum.photos/seed/lot'+i+'/400/300',start:100,increment:50,currentBid:0,currentBidder:''};
+      }
+      renderSaleMeta();
+      renderLots();
+    }
+
+    // Creating lots from the seller form
+    document.getElementById('createLots').addEventListener('click', ()=>{
+      const n = parseInt(document.getElementById('numLots').value,10)||0;
+      const global = document.getElementById('globalPricing').value === 'yes';
+      const start = parseFloat(document.getElementById('globalStart').value)||0;
+      const increment = parseFloat(document.getElementById('globalIncrement').value)||1;
+      for(let i=1;i<=n;i++){
+        const id = 'lot'+(Object.keys(DEMO.lots).length+1);
+        DEMO.lots[id] = {id,ear:'Lot '+id,breed:'',pedigree:'',photoUrl:'https://picsum.photos/seed/'+id+'/400/300',start: global ? start : 0,increment: global ? increment : 0,currentBid:0,currentBidder:''};
+      }
+      renderLots();
+    });
+
+    // Save sale (demo in-memory)
+    document.getElementById('saveSale').addEventListener('click', ()=>{
+      DEMO.meta.business = document.getElementById('businessName').value || DEMO.meta.business || 'Unnamed Business';
+      DEMO.meta.saleName = document.getElementById('saleName').value || DEMO.meta.saleName;
+      DEMO.meta.start = document.getElementById('startDate').value || DEMO.meta.start;
+      DEMO.meta.end = document.getElementById('endDate').value || DEMO.meta.end;
+      // TODO: upload logo file and set URL
+      renderSaleMeta();
+      alert('Sale saved (demo). In production this writes to Firebase/Firestore.');
+    });
+
+    function renderSaleMeta(){
+      document.getElementById('saleTimes').textContent = `${DEMO.meta.business} — ${DEMO.meta.saleName} \n` + formatDateRange(DEMO.meta.start,DEMO.meta.end);
+    }
+
+    // Render lots grid
+    function renderLots(){
+      const grid = document.getElementById('lotsGrid'); grid.innerHTML = '';
+      const lots = Object.values(DEMO.lots);
+      for(const lot of lots){
+        const el = document.createElement('div'); el.className='card';
+        el.innerHTML = `<h3>${lot.ear} — <small style="color:var(--muted);font-size:12px">${lot.breed||'Breed'}</small></h3>
+        <img src="${lot.photoUrl||'https://picsum.photos/400/300'}" alt="lot photo" onclick="openImage(this.src)">
+        <p style="margin-top:8px">${lot.pedigree||'Pedigree not provided'}</p>
+        <div class="lottable">
+          <div><small>Current Bid</small><strong>${lot.currentBid>0 ? '$'+lot.currentBid.toFixed(2) : '<span style="color:var(--muted)">Starting Bid $'+(lot.start||0).toFixed(2)+'</span>'}</strong></div>
+          <div style="text-align:right"><small>Winning Bidder</small><strong>${lot.currentBidder || '—'}</strong></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;justify-content:space-between">
+          <button class="btn" onclick="openEditLot('${lot.id}')">Edit</button>
+          <button class="btn ghost" onclick="openBidPreview('${lot.id}')">Preview Bid</button>
+        </div>`;
+        grid.appendChild(el);
+      }
+    }
+
+    // Simple image viewer
+    window.openImage = function(src){
+      const w = window.open('','_blank');
+      w.document.write(`<img src="${src}" style="max-width:100%;height:auto;display:block;margin:20px auto;background:#000;padding:10px">`);
+    }
+
+    // Edit lot -> prefill modal
+    window.openEditLot = function(id){
+      const lot = DEMO.lots[id];
+      showModal(true);
+      document.getElementById('modalTitle').textContent = 'Edit Lot '+id;
+      document.getElementById('lotEar').value = lot.ear||'';
+      document.getElementById('lotBreed').value = lot.breed||'';
+      document.getElementById('lotPedigree').value = lot.pedigree||'';
+      document.getElementById('lotStart').value = lot.start||0;
+      document.getElementById('lotIncrement').value = lot.increment||1;
+      document.getElementById('saveLotBtn').dataset.editId = id;
+    }
+
+    function showModal(show){
+      document.getElementById('modalBackdrop').style.display = show ? 'flex' : 'none';
+    }
+    document.getElementById('cancelLotBtn').addEventListener('click', ()=>{showModal(false);});
+    document.getElementById('saveLotBtn').addEventListener('click', ()=>{
+      const id = document.getElementById('saveLotBtn').dataset.editId || 'lot'+uid(4);
+      const ear = document.getElementById('lotEar').value||id;
+      const breed = document.getElementById('lotBreed').value||'';
+      const pedigree = document.getElementById('lotPedigree').value||'';
+      const start = parseFloat(document.getElementById('lotStart').value)||0;
+      const increment = parseFloat(document.getElementById('lotIncrement').value)||1;
+      // For demo: photo upload not implemented. In production, upload to Firebase Storage and get URL.
+      DEMO.lots[id] = DEMO.lots[id] || {id};
+      Object.assign(DEMO.lots[id],{id,ear,breed,pedigree,start,increment});
+      showModal(false);
+      renderLots();
+    });
+
+    // --------------------------
+    // Controls: start/pause/end
+    // --------------------------
+    document.getElementById('startSale').addEventListener('click', ()=>{
+      alert('Start Sale pressed (demo). In production this flips a field in Firestore to allow bids.');
+    });
+    document.getElementById('pauseSale').addEventListener('click', ()=>{
+      alert('Pause Sale pressed (demo).');
+    });
+    document.getElementById('endSale').addEventListener('click', ()=>{
+      alert('End Sale pressed (demo).');
+    });
+
+    // --------------------------
+    // Export CSVs
+    // --------------------------
+    document.getElementById('exportAll').addEventListener('click', ()=>{
+      // Collect all bids
+      const rows=[['Lot','Bidder','Amount','$','Timestamp']];
+      for(const bidId in DEMO.bids){
+        const b = DEMO.bids[bidId];
+        rows.push([b.lotId, b.bidderId, '$'+b.amount.toFixed(2), '', new Date(b.ts).toLocaleString()]);
+      }
+      downloadBlob('all_bids.csv', csvFromArray(rows));
+    });
+
+    document.getElementById('exportWinners').addEventListener('click', ()=>{
+      const rows=[['Lot','Ear Notch','Winning Bidder','Amount']];
+      for(const lotId in DEMO.lots){
+        const l = DEMO.lots[lotId];
+        rows.push([lotId, l.ear, l.currentBidder||'', l.currentBid||l.start||0]);
+      }
+      downloadBlob('winning_bids.csv', csvFromArray(rows));
+    });
+
+    // Share live link
+    document.getElementById('shareLive').addEventListener('click', async ()=>{
+      const liveUrl = window.location.origin + window.location.pathname + '?live=' + encodeURIComponent(DEMO.saleId || 'demo');
+      await navigator.clipboard.writeText(liveUrl);
+      alert('Live link copied to clipboard:\n'+liveUrl);
+    });
+
+    // --------------------------
+    // Bid preview / submit (seller preview) — opens bid modal
+    // --------------------------
+    window.openBidPreview = function(lotId){
+      const lot = DEMO.lots[lotId];
+      document.getElementById('bidPreview').innerHTML = `<strong>${lot.ear}</strong><div style="color:var(--muted)">${lot.pedigree}</div>`;
+      document.getElementById('bidAmount').value = (lot.currentBid>0?lot.currentBid+lot.increment:Math.max(lot.start,lot.increment));
+      document.getElementById('bidAmount').dataset.lotId = lotId;
+      document.getElementById('bidBackdrop').style.display = 'flex';
+    }
+
+    document.getElementById('cancelBidBtn').addEventListener('click', ()=> document.getElementById('bidBackdrop').style.display='none');
+
+    document.getElementById('submitBidBtn').addEventListener('click', ()=>{
+      const lotId = document.getElementById('bidAmount').dataset.lotId;
+      const last4 = document.getElementById('bidPhone').value.trim();
+      const bidnum = document.getElementById('bidNumber').value.trim();
+      const amount = parseFloat(document.getElementById('bidAmount').value)||0;
+      if(!lotId) return;
+      const lot = DEMO.lots[lotId];
+      const min = lot.currentBid>0 ? (lot.currentBid + lot.increment) : Math.max(lot.start, lot.increment);
+      if(amount < min){ document.getElementById('bidMsg').textContent = `Bid must be at least $${min.toFixed(2)}`; return; }
+      // Enforce increment logic
+      if(((amount - (lot.currentBid>0?lot.currentBid:lot.start)) % lot.increment) !== 0){
+        document.getElementById('bidMsg').textContent = `Bid increments must be multiples of $${lot.increment}`; return;
+      }
+      // demo bidder creation
+      let bidderId = bidnum || ('B' + uid(4));
+      DEMO.bidders[bidderId] = {id:bidderId,phone:last4,name:'(anonymous)'};
+      const bidId = 'bid_'+uid(6);
+      const now = Date.now();
+      DEMO.bids[bidId] = {id:bidId,lotId,amount,bidderId,ts:now};
+      // update lot
+      lot.currentBid = amount; lot.currentBidder = bidderId;
+      renderLots();
+      document.getElementById('bidBackdrop').style.display = 'none';
+      alert('Bid accepted (demo). In production this would write to Firestore and update real-time clients.');
+    });
+
+    // Keyboard accessibility: close modals with escape
+    document.addEventListener('keydown', (e)=>{
+      if(e.key === 'Escape'){
+        document.getElementById('modalBackdrop').style.display='none';
+        document.getElementById('bidBackdrop').style.display='none';
+      }
+    });
+
+    // initial render
+    renderLots();
+
+    // --------------------------
+    // Notes for production implementation (will NOT run here):
+    // 1) Initialize Firebase app and Firestore. Use security rules to ensure only authorized sellers (by entry code) can write to their sale doc.
+    // 2) Store images in Firebase Storage and save URLs to lot documents.
+    // 3) Use Firestore listeners (onSnapshot) on sales/{saleId}/lots and .../bids to update both seller dashboard and live bidding board in real-time.
+    // 4) Implement bidders creation on the live site and map bidder numbers to contact info under sales/{saleId}/bidders for seller-only view.
+    // 5) Use Cloud Functions or client-side checks to enforce increment rules, but validate server-side as well to prevent manipulation.
+    // 6) Use authenticated admin for export endpoints if you want to restrict CSV export.
+    // --------------------------
+  </script>
 </body>
 </html>
