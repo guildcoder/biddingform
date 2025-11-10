@@ -1,35 +1,137 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Caprock Livestock Bidding Board</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Caprock Livestock Exchange — Seller Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    /* trimmed for brevity — keep same styles as your prototype, minor additions */
+    :root{--bg:#0f1724;--card:#0b1320;--muted:#94a3b8;--accent:#0ea5a4;--glass: rgba(255,255,255,0.03);--glass-2: rgba(255,255,255,0.02);font-family:Inter,system-ui,Helvetica,Arial}
+    *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#061226 0%, #071427 60%);color:#e6eef6;min-height:100vh}
+    header{padding:22px 28px;display:flex;gap:14px;align-items:center}
+    h1{margin:0;font-weight:800}
+    .container{max-width:1120px;margin:12px auto;padding:12px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.03)}
+    input,select,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    .btn{background:var(--accent);border:none;padding:10px 14px;border-radius:10px;font-weight:600;color:#042826;cursor:pointer}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:12px}
+    .lot-card img{width:100%;height:140px;object-fit:cover;border-radius:8px}
+    .controls{display:flex;gap:10px;align-items:center}
+    @media (max-width:900px){.grid{grid-template-columns:repeat(3,1fr)}} @media (max-width:600px){.grid{grid-template-columns:repeat(2,1fr)}} @media (max-width:420px){.grid{grid-template-columns:repeat(1,1fr)}}
+  </style>
 </head>
-<body class="bg-light">
-  <div class="container py-4">
-    <h1 class="text-center mb-4">Caprock Livestock Bidding Board</h1>
-
-    <div class="card mb-4 p-3">
-      <h4>Create New Lot</h4>
-      <input id="lotTitle" class="form-control mb-2" placeholder="Lot Title">
-      <input id="lotPedigree" class="form-control mb-2" placeholder="Pedigree">
-      <textarea id="lotDescription" class="form-control mb-2" placeholder="Description"></textarea>
-      <input id="lotBreed" class="form-control mb-2" placeholder="Breed">
-      <input id="lotStartPrice" type="number" class="form-control mb-2" placeholder="Starting Price">
-      <input id="lotIncrement" type="number" class="form-control mb-2" placeholder="Bid Increment">
-      <input id="lotImage" type="file" class="form-control mb-2">
-      <button id="addLotBtn" class="btn btn-primary w-100">Add Lot</button>
+<body>
+  <header>
+    <div style="width:56px;height:56px;border-radius:10px;background:linear-gradient(90deg,var(--accent),#62d0ce)"></div>
+    <div>
+      <h1>Caprock Livestock Exchange — Seller Dashboard</h1>
+      <div style="color:var(--muted);font-size:13px">Create and manage sales — uploads go to Firebase Storage, lots & bids in Firestore</div>
     </div>
+  </header>
 
-    <div id="lotsContainer" class="row g-3"></div>
+  <main class="container">
+    <!-- Entry gate -->
+    <section class="card" id="entryCard">
+      <h3>Enter your seller entry code</h3>
+      <p style="color:var(--muted)">Only sellers with a valid entry code can edit a sale. For testing use code <strong>DEMO</strong> or create a sale below.</p>
+      <div style="display:flex;gap:8px">
+        <input id="entryInput" placeholder="6-digit entry code or DEMO" />
+        <button id="unlockBtn" class="btn">Unlock</button>
+        <button id="createSaleBtn" class="btn ghost">Create New Sale</button>
+      </div>
+      <div id="entryMsg" style="color:#ffb4b4;margin-top:8px;display:none"></div>
+    </section>
+
+    <!-- Seller panel (hidden until unlocked) -->
+    <section id="dashboard" style="display:none;margin-top:12px">
+      <div class="card">
+        <h3>Create / Edit Sale</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <label>Business Name</label><input id="businessName" placeholder="e.g. Caprock Ranch Co.">
+          </div>
+          <div>
+            <label>Sale Name</label><input id="saleName" placeholder="e.g. October Fall Dispersal">
+          </div>
+          <div>
+            <label>Logo (optional)</label><input id="logoFile" type="file" accept="image/*">
+          </div>
+          <div>
+            <label>Sale Description</label><input id="saleDesc" placeholder="Short sale description">
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:10px;align-items:center">
+          <div style="flex:1">
+            <label>Sale Start</label><input id="startDate" type="datetime-local">
+          </div>
+          <div style="flex:1">
+            <label>Sale End</label><input id="endDate" type="datetime-local">
+          </div>
+          <div style="flex:1">
+            <label>Timezone</label>
+            <select id="tzSelect"></select>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+          <button id="saveSaleBtn" class="btn">Save Sale</button>
+          <button id="createLotsBtn" class="btn ghost">Create Lots</button>
+          <div style="margin-left:auto;color:var(--muted)">Sale will automatically begin & end at the selected times</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3>Controls</h3>
+        <div class="controls">
+          <button id="startSale" class="btn">Start Sale</button>
+          <button id="pauseSale" class="btn ghost">Pause Sale</button>
+          <button id="endSale" class="btn ghost">End Sale</button>
+          <button id="exportAll" class="btn ghost">Export All Bids</button>
+          <button id="exportWinners" class="btn ghost">Export Winning Bids</button>
+          <button id="copyLink" class="btn" style="margin-left:auto">Share Live Bidding Site</button>
+        </div>
+        <div style="margin-top:8px;color:var(--muted)" id="saleInfo">No sale loaded</div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3>Lots</h3>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <label style="width:150px">Add new lot</label>
+          <input id="newEar" placeholder="Lot # / Ear Notch" />
+          <input id="newBreed" placeholder="Breed" />
+          <input id="newPed" placeholder="Pedigree" />
+          <input id="newStart" type="number" placeholder="Start $" />
+          <input id="newIncrement" type="number" placeholder="Increment $" />
+          <input id="newPhoto" type="file" accept="image/*" />
+          <button id="addLotBtn" class="btn">Add Lot</button>
+        </div>
+
+        <div id="lotsGrid" class="grid"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- modals -->
+  <div id="imageModal" style="display:none;position:fixed;inset:0;background:rgba(2,6,23,.7);align-items:center;justify-content:center">
+    <img id="imageModalImg" src="" style="max-width:95%;max-height:95%;margin:auto;display:block">
   </div>
 
   <script type="module">
+    /* ============================
+       Firebase v10 modules (ESM)
+       ============================ */
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+    import {
+      getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs,
+      onSnapshot, query, where, orderBy, serverTimestamp, updateDoc,
+      runTransaction
+    } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-storage.js";
 
+    // --- your Firebase config (you provided this earlier) ---
     const firebaseConfig = {
       apiKey: "AIzaSyCquC_ZsPf59yGnlFLzK8Du1mgibvKOK_M",
       authDomain: "biddingapp-a6d8e.firebaseapp.com",
@@ -44,46 +146,312 @@
     const db = getFirestore(app);
     const storage = getStorage(app);
 
-    const lotsRef = collection(db, 'lots');
+    // ---------- helpers ----------
+    const uid = (n=6) => Math.random().toString(36).slice(2,2+n);
+    const $ = id => document.getElementById(id);
 
-    // Add a new lot
-    document.getElementById('addLotBtn').addEventListener('click', async () => {
-      const title = document.getElementById('lotTitle').value.trim();
-      const pedigree = document.getElementById('lotPedigree').value.trim();
-      const description = document.getElementById('lotDescription').value.trim();
-      const breed = document.getElementById('lotBreed').value.trim();
-      const startPrice = parseFloat(document.getElementById('lotStartPrice').value);
-      const increment = parseFloat(document.getElementById('lotIncrement').value);
-      const file = document.getElementById('lotImage').files[0];
+    // timezone selector (simple; you can improve)
+    (function fillTimezones(){
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const sel = $('tzSelect');
+      const opt = document.createElement('option'); opt.value = tz; opt.textContent = tz + ' (local)'; sel.appendChild(opt);
+    })();
 
-      if (!title || !startPrice || !increment || !file) {
-        alert('Please fill out all required fields.');
+    // --------- state ----------
+    let SALE_DOC_ID = null; // will hold firestore sale doc id
+    let SALE = null; // sale doc contents
+    let LOTS_UNSUB = null;
+    let LOTS_MAP = {}; // local cache id->data
+
+    // --------- entry / load sale ----------
+    $('unlockBtn').addEventListener('click', async ()=>{
+      const code = $('entryInput').value.trim();
+      if(!code){ $('entryMsg').textContent='Enter a code or DEMO'; $('entryMsg').style.display='block'; return; }
+      $('entryMsg').style.display='none';
+      await loadSaleByCode(code);
+    });
+
+    $('createSaleBtn').addEventListener('click', async ()=>{
+      // create a brand new sale doc and then open it
+      const entryCode = prompt("Create an entry code for this sale (e.g. 6-digit or CUSTOM). Leave blank to auto-generate:");
+      const code = entryCode && entryCode.trim() ? entryCode.trim() : ('S'+uid(5)).toUpperCase();
+      const saleRef = await addDoc(collection(db,'sales'), {
+        entryCode: code,
+        business: 'New Business',
+        saleName: 'New Sale',
+        start: null,
+        end: null,
+        tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        status: 'draft',
+        createdAt: serverTimestamp()
+      });
+      alert('Sale created. Entry code: ' + code);
+      await loadSale(saleRef.id);
+    });
+
+    async function loadSaleByCode(code){
+      if(code === 'DEMO'){
+        // create a demo sale in Firestore (or load local demo)
+        // For simplicity create a lightweight local 'demo' sale (no writes)
+        SALE_DOC_ID = 'DEMO';
+        SALE = { entryCode:'DEMO', business:'Caprock Ranch Co.', saleName:'Demo Fall Sale', start: new Date().toISOString(), end: new Date(Date.now()+86400000).toISOString(), tz: Intl.DateTimeFormat().resolvedOptions().timeZone, status:'live' };
+        // create demo lots locally
+        LOTS_MAP = {};
+        for(let i=1;i<=6;i++){
+          const id = 'demoLot'+i;
+          LOTS_MAP[id] = { id, ear: 'Lot '+i, breed:'Angus', pedigree:'Sire x Dam', imageUrl: 'https://picsum.photos/seed/lot'+i+'/800/600', start:100, increment:50, currentBid:0, currentBidder:''};
+        }
+        showDashboard();
+        renderLotsGrid();
         return;
       }
 
-      try {
-        const storageRef = ref(storage, `lot-images/${Date.now()}_${file.name}`);
-        await uploadBytes(storageRef, file);
-        const imageUrl = await getDownloadURL(storageRef);
+      // Query sales where entryCode == code
+      const q = query(collection(db,'sales'), where('entryCode','==',code), orderBy('createdAt','desc'));
+      const snap = await getDocs(q);
+      if(snap.empty){ $('entryMsg').textContent='No sale found for that entry code.'; $('entryMsg').style.display='block'; return; }
+      const doc0 = snap.docs[0];
+      await loadSale(doc0.id);
+    }
 
-        await addDoc(lotsRef, {
-          title, pedigree, description, breed, startPrice, increment,
-          currentBid: startPrice, imageUrl, timestamp: serverTimestamp()
-        });
+    async function loadSale(saleId){
+      SALE_DOC_ID = saleId;
+      const saleRef = doc(db,'sales',saleId);
+      const saleSnap = await getDoc(saleRef);
+      if(!saleSnap.exists()){ alert('Sale doc not found'); return; }
+      SALE = saleSnap.data();
+      // show dashboard
+      showDashboard();
+      // listen to lots (real-time)
+      if(LOTS_UNSUB) LOTS_UNSUB();
+      const q = query(collection(db,'sales',saleId,'lots'), orderBy('createdAt','asc'));
+      LOTS_UNSUB = onSnapshot(q, snap => {
+        LOTS_MAP = {};
+        snap.forEach(d => LOTS_MAP[d.id] = { id:d.id, ...d.data() });
+        renderLotsGrid();
+      });
+    }
 
-        document.querySelectorAll('input, textarea').forEach(el => el.value = '');
-        alert('Lot added successfully!');
-      } catch (e) {
-        console.error('Error adding lot:', e);
-        alert('Error adding lot. Check console.');
+    function showDashboard(){
+      $('entryCard').style.display='none';
+      $('dashboard').style.display='block';
+      // populate sale meta inputs if available
+      if(SALE){
+        $('businessName').value = SALE.business || '';
+        $('saleName').value = SALE.saleName || '';
+        $('startDate').value = SALE.start ? (new Date(SALE.start)).toISOString().slice(0,16) : '';
+        $('endDate').value = SALE.end ? (new Date(SALE.end)).toISOString().slice(0,16) : '';
+        $('saleInfo').textContent = `${SALE.business || ''} — ${SALE.saleName || ''} (status: ${SALE.status || 'draft'})`;
+      } else {
+        $('saleInfo').textContent = 'DEMO (local only)';
       }
+    }
+
+    // --------- save sale meta ----------
+    $('saveSaleBtn').addEventListener('click', async ()=>{
+      if(!SALE_DOC_ID || SALE_DOC_ID === 'DEMO'){ alert('Cannot save demo sale. Unlock a real sale first.'); return; }
+      const saleRef = doc(db,'sales',SALE_DOC_ID);
+      const business = $('businessName').value.trim();
+      const saleName = $('saleName').value.trim();
+      const start = $('startDate').value ? new Date($('startDate').value).toISOString() : null;
+      const end = $('endDate').value ? new Date($('endDate').value).toISOString() : null;
+      // optionally upload logo
+      const logoFile = $('logoFile').files[0];
+      let logoUrl = SALE?.logoUrl || null;
+      if(logoFile){
+        const sref = ref(storage, `sales/${SALE_DOC_ID}/logo_${Date.now()}_${logoFile.name}`);
+        await uploadBytes(sref, logoFile);
+        logoUrl = await getDownloadURL(sref);
+      }
+      await setDoc(saleRef, { business, saleName, start, end, tz: $('tzSelect').value || Intl.DateTimeFormat().resolvedOptions().timeZone, logoUrl, status: SALE.status || 'draft' }, { merge:true });
+      alert('Sale saved');
+      const updated = await getDoc(saleRef);
+      SALE = updated.data();
+      showDashboard();
     });
 
-    // Live listener for lots
-    const q = query(lotsRef, orderBy('timestamp', 'desc'));
-    onSnapshot(q, (snapshot) => {
-      const lotsContainer = document.getElementById('lotsContainer');
-      lotsContainer.innerHTML = '';
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        const card = document.createEl
+    // --------- create lots in bulk (simple) ----------
+    $('createLotsBtn').addEventListener('click', async ()=>{
+      if(SALE_DOC_ID === 'DEMO' || !SALE_DOC_ID){ alert('Unlock a real sale to create lots'); return; }
+      const n = parseInt(prompt('How many lots to add?','6'),10) || 0;
+      if(n<=0) return;
+      for(let i=0;i<n;i++){
+        await addDoc(collection(db,'sales',SALE_DOC_ID,'lots'), {
+          ear: `Lot ${i+1}`,
+          breed: '',
+          pedigree: '',
+          imageUrl: '',
+          start: 100,
+          increment: 50,
+          currentBid: 0,
+          currentBidder: '',
+          createdAt: serverTimestamp()
+        });
+      }
+      alert('Lots created');
+    });
+
+    // --------- add single lot ----------
+    $('addLotBtn').addEventListener('click', async ()=>{
+      const ear = $('newEar').value.trim() || `Lot ${uid(3)}`;
+      const breed = $('newBreed').value.trim();
+      const pedigree = $('newPed').value.trim();
+      const start = parseFloat($('newStart').value) || 0;
+      const increment = parseFloat($('newIncrement').value) || 1;
+      const file = $('newPhoto').files[0];
+
+      if(SALE_DOC_ID === 'DEMO' || !SALE_DOC_ID){ alert('Unlock a real sale to add lots'); return; }
+      try{
+        let imageUrl = '';
+        if(file){
+          const sref = ref(storage, `sales/${SALE_DOC_ID}/lots/${Date.now()}_${file.name}`);
+          await uploadBytes(sref, file);
+          imageUrl = await getDownloadURL(sref);
+        }
+        await addDoc(collection(db,'sales',SALE_DOC_ID,'lots'), {
+          ear, breed, pedigree, start, increment, imageUrl, currentBid: 0, currentBidder:'', createdAt: serverTimestamp()
+        });
+        // clear inputs
+        $('newEar').value='';$('newBreed').value='';$('newPed').value='';$('newStart').value='';$('newIncrement').value='';$('newPhoto').value=null;
+      }catch(err){ console.error(err); alert('Error adding lot'); }
+    });
+
+    // --------- render lots grid ----------
+    function renderLotsGrid(){
+      const grid = $('lotsGrid'); grid.innerHTML='';
+      const lots = Object.values(LOTS_MAP);
+      lots.forEach(lot=>{
+        const div = document.createElement('div'); div.className='card lot-card';
+        div.innerHTML = `
+          <h3 style="margin:8px 0">${lot.ear} <small style="color:var(--muted);font-size:12px">${lot.breed || ''}</small></h3>
+          <img src="${lot.imageUrl || 'https://picsum.photos/seed/'+lot.id+'/800/600'}" alt="lot image" onclick="openImageModal(this.src)">
+          <p style="margin:8px 0;color:var(--muted)">${lot.pedigree || ''}</p>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><small>Current:</small><div><strong>${lot.currentBid && lot.currentBid>0 ? '$'+Number(lot.currentBid).toFixed(2) : 'Starting $'+(lot.start||0).toFixed(2)}</strong></div></div>
+            <div style="display:flex;gap:6px">
+              <button class="btn" onclick="editLot('${lot.id}')">Edit</button>
+              <button class="btn ghost" onclick="openBidPreview('${lot.id}')">Preview Bid</button>
+            </div>
+          </div>
+        `;
+        grid.appendChild(div);
+      });
+    }
+
+    // expose helper used in HTML
+    window.openImageModal = function(src){ $('imageModal').style.display='flex'; $('imageModalImg').src = src; };
+    document.getElementById('imageModal').addEventListener('click', ()=>{ document.getElementById('imageModal').style.display='none'; });
+
+    // --------- edit lot (simple inline prompt for demo) ----------
+    window.editLot = async function(lotId){
+      if(SALE_DOC_ID === 'DEMO'){ alert('Cannot edit demo lot'); return; }
+      const lotRef = doc(db,'sales',SALE_DOC_ID,'lots',lotId);
+      const snap = await getDoc(lotRef);
+      if(!snap.exists()) return;
+      const data = snap.data();
+      const ear = prompt('Ear Notch / Title', data.ear || '') || data.ear;
+      const breed = prompt('Breed', data.breed || '') || data.breed;
+      const pedigree = prompt('Pedigree', data.pedigree || '') || data.pedigree;
+      // NOTE: for image replacement you'd implement a file upload UI per-lot
+      await updateDoc(lotRef, { ear, breed, pedigree });
+    };
+
+    // --------- preview bid modal for seller (reuses live bidding UI) ----------
+    window.openBidPreview = function(lotId){
+      // open a new small window to simulate public view, or reuse live page url
+      const url = window.location.origin + window.location.pathname.replace(/index\.html$/,'live.html') + '?live=' + encodeURIComponent(SALE_DOC_ID || 'DEMO') + '&previewLot=' + encodeURIComponent(lotId);
+      window.open(url,'_blank');
+    };
+
+    // --------- admin controls: start/pause/end ----------
+    $('startSale').addEventListener('click', async ()=>{
+      if(!SALE_DOC_ID || SALE_DOC_ID === 'DEMO'){ alert('Open a real sale to change status'); return; }
+      await updateDoc(doc(db,'sales',SALE_DOC_ID), { status:'live', startedAt: serverTimestamp() });
+      alert('Sale started');
+    });
+    $('pauseSale').addEventListener('click', async ()=>{
+      if(!SALE_DOC_ID || SALE_DOC_ID === 'DEMO'){ alert('Open a real sale to change status'); return; }
+      await updateDoc(doc(db,'sales',SALE_DOC_ID), { status:'paused' });
+      alert('Sale paused');
+    });
+    $('endSale').addEventListener('click', async ()=>{
+      if(!SALE_DOC_ID || SALE_DOC_ID === 'DEMO'){ alert('Open a real sale to change status'); return; }
+      await updateDoc(doc(db,'sales',SALE_DOC_ID), { status:'ended', endedAt: serverTimestamp() });
+      alert('Sale ended');
+    });
+
+    // --------- copy live link ----------
+    $('copyLink').addEventListener('click', async ()=>{
+      const liveUrl = window.location.origin + '/live.html?live=' + encodeURIComponent(SALE_DOC_ID || 'DEMO');
+      await navigator.clipboard.writeText(liveUrl);
+      alert('Live link copied: ' + liveUrl);
+    });
+
+    // --------- export CSVs ----------
+    async function exportAllBids(){
+      if(!SALE_DOC_ID || SALE_DOC_ID==='DEMO'){ alert('Unlock a real sale to export'); return; }
+      // pull all bids across lots
+      const lotDocs = await getDocs(collection(db, 'sales', SALE_DOC_ID, 'lots'));
+      const rows = [['LotID','Ear','BidderNumber','Amount','Timestamp']];
+      for(const ldoc of lotDocs.docs){
+        const bidsSnap = await getDocs(collection(db,'sales',SALE_DOC_ID,'lots',ldoc.id,'bids'));
+        for(const bdoc of bidsSnap.docs){
+          const b = bdoc.data();
+          rows.push([ldoc.id, ldoc.data().ear || '', b.bidderNumber || '', b.amount || '', b.createdAt ? new Date(b.createdAt.seconds*1000).toLocaleString() : '']);
+        }
+      }
+      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+      downloadBlob('all_bids.csv', csv);
+    }
+
+    async function exportWinners(){
+      if(!SALE_DOC_ID || SALE_DOC_ID==='DEMO'){ alert('Unlock a real sale to export'); return; }
+      const rows = [['LotID','Ear','WinningBidderNumber','WinningAmount']];
+      const lotDocs = await getDocs(collection(db,'sales',SALE_DOC_ID,'lots'));
+      for(const ldoc of lotDocs.docs){
+        const d = ldoc.data();
+        rows.push([ldoc.id, d.ear || '', d.currentBidder || '', d.currentBid || d.start || 0]);
+      }
+      const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+      downloadBlob('winning_bids.csv', csv);
+    }
+
+    $('exportAll').addEventListener('click', exportAllBids);
+    $('exportWinners').addEventListener('click', exportWinners);
+
+    function downloadBlob(filename, text){
+      const blob = new Blob([text], {type:'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),5000);
+    }
+
+    // ---------- real-time listener to update saleInfo (status changes etc) ----------
+    // If a sale is loaded, listen for updates to its doc to reflect status changes live.
+    let SALE_UNSUB = null;
+    async function enableSaleListener(){
+      if(!SALE_DOC_ID || SALE_DOC_ID === 'DEMO') return;
+      if(SALE_UNSUB) SALE_UNSUB();
+      const saleRef = doc(db,'sales',SALE_DOC_ID);
+      SALE_UNSUB = onSnapshot(saleRef, snap => {
+        if(!snap.exists()) return;
+        SALE = snap.data();
+        $('saleInfo').textContent = `${SALE.business || ''} — ${SALE.saleName || ''} (status: ${SALE.status || 'draft'})`;
+      });
+    }
+
+    // call enableSaleListener after loadSale
+    const origLoadSale = loadSale;
+    loadSale = async (saleId) => { await origLoadSale(saleId); await enableSaleListener(); };
+
+    // Utils: lot bidding preview opens live page
+    window.openBidPreview = function(lotId){
+      const url = `${window.location.origin}/live.html?live=${encodeURIComponent(SALE_DOC_ID)}&previewLot=${encodeURIComponent(lotId)}`;
+      window.open(url,'_blank');
+    };
+
+    // cleanup on unload
+    window.addEventListener('beforeunload', ()=>{ if(LOTS_UNSUB) LOTS_UNSUB(); if(SALE_UNSUB) SALE_UNSUB(); });
+  </script>
+</body>
+</html>
