@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seller Login - Caprock Livestock Exchange</title>
+<style>
+    body { margin:0; font-family:'Oswald', sans-serif; background:#0D1B2A; color:#F7F2EC; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
+    h1 { color:#8A1E1E; }
+    .login-container { display:flex; flex-direction:column; gap:15px; background:#F7F2EC; color:#0D1B2A; padding:40px; border-radius:20px; box-shadow:0 4px 15px rgba(0,0,0,0.3); min-width:300px; }
+    input { padding:10px; border-radius:10px; border:none; font-size:1rem; width:100%; }
+    button { padding:10px; border-radius:10px; border:none; font-size:1rem; cursor:pointer; background:#8A1E1E; color:#F7F2EC; transition:background 0.2s; }
+    button:hover { background:#B22222; }
+    #loginStatus { color:#8A1E1E; text-align:center; margin-top:10px; }
+</style>
+</head>
+<body>
+<h1>Seller Login</h1>
+<div class="login-container">
+    <input type="text" id="sellerName" placeholder="Enter Name">
+    <input type="text" id="sellerCode" placeholder="Enter Access Code">
+    <button id="unlockBtn">Unlock</button>
+    <div id="loginStatus"></div>
+</div>
+
+<script>
+async function unlockSeller() {
+    const name = document.getElementById("sellerName").value.trim();
+    const code = document.getElementById("sellerCode").value.trim();
+    const infoBox = document.getElementById("loginStatus");
+
+    try {
+        const response = await fetch("./authorized.txt");
+        if (!response.ok) {
+            infoBox.textContent = "Error loading authorization file.";
+            return;
+        }
+        const text = await response.text();
+        const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+
+        for (let i = 0; i < lines.length; i += 3) {
+            const userName = lines[i];
+            const expiration = lines[i + 1];
+            const accessCode = lines[i + 2];
+
+            if (name === userName && code === accessCode) {
+                const today = new Date().toISOString().split("T")[0];
+                if (today <= expiration) {
+                    window.location.href = "seller.html";
+                    return;
+                } else {
+                    infoBox.textContent = "Your access has expired.";
+                    return;
+                }
+            }
+        }
+        infoBox.textContent = "Invalid credentials.";
+    } catch (error) {
+        infoBox.textContent = "Login system error.";
+        console.error(error);
+    }
+}
+
+document.getElementById("unlockBtn").addEventListener("click", unlockSeller);
+</script>
+</body>
+</html>
