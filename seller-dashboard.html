@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seller Dashboard — Caprock</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Inter:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root{--dusty:#F8F4EF;--royal:#7A0A0A;--navy:#0A1B3D;--muted:#6f6b66}
+body{margin:0;background:linear-gradient(180deg,var(--dusty),#efece8);color:var(--navy);font-family:Inter,system-ui,Arial}
+.header{background:var(--royal);color:white;padding:18px;text-align:center;font-family:'Playfair Display',serif}
+.container{max-width:1100px;margin:18px auto;padding:18px}
+.grid{display:grid;grid-template-columns:1fr 360px;gap:20px}
+.card{background:white;padding:16px;border-radius:12px;box-shadow:0 10px 24px rgba(7,18,51,0.06)}
+input,textarea,select,button{width:100%;padding:10px;border-radius:8px;border:1px solid #e6e3e0;margin-top:8px}
+.btn-primary{background:var(--royal);color:white;border:0;padding:10px;border-radius:8px;cursor:pointer}
+.small{font-size:0.9rem;color:var(--muted)}
+.lots{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:12px}
+.lot-card{background:linear-gradient(180deg,#fff,#fbfbfb);padding:10px;border-radius:10px;border:1px solid #eee}
+</style>
+<!-- Firebase libs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+</head>
+<body>
+  <div class="header">Caprock — Seller Dashboard</div>
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px">
+      <div>
+        <div id="welcome" style="font-weight:600"></div>
+        <div id="expires" class="small"></div>
+      </div>
+      <div><button id="signout" style="background:#efefef;color:var(--navy);padding:8px;border-radius:8px;border:1px solid #ddd">Sign out</button></div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Create a Sale</h3>
+        <input id="saleName" placeholder="Sale name (visible on live boards)">
+        <input id="businessName" placeholder="Business name">
+        <input id="saleBanner" type="file" accept="image/*">
+        <textarea id="saleDesc" placeholder="Description (optional)"></textarea>
+        <div style="display:flex;gap:8px">
+          <input id="startDT" type="datetime-local">
+          <input id="endDT" type="datetime-local">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <select id="tzStart"><option value="America/Chicago">America/Chicago</option><option value="UTC">UTC</option></select>
+          <select id="tzEnd"><option value="America/Chicago">America/Chicago</option><option value="UTC">UTC</option></select>
+        </div>
+        <button id="createSaleBtn" class="btn-primary">Create Sale</button>
+        <p id="createSaleMsg" class="small"></p>
+      </div>
+
+      <div class="card">
+        <h4>Your Recent Sales</h4>
+        <div id="salesList" class="small"></div>
+        <hr>
+        <div class="small muted">After creating a sale click its "Open" link to add lots & manage it.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* firebase config (NEW) */
+const firebaseConfig = {
+  apiKey: "AIzaSyALZBdsPYaEV9CfdzrOvJu10dlvdi4TeSE",
+  authDomain: "bid-board-6b84e.firebaseapp.com",
+  projectId: "bid-board-6b84e",
+  storageBucket: "bid-board-6b84e.firebasestorage.app",
+  messagingSenderId: "798947738973",
+  appId: "1:798947738973:web:024c3e6caff609aaf494b4",
+  measurementId: "G-P5XF72PEKF"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+// check session
+const authRaw = sessionStorage.getItem('sellerAuth');
+if(!authRaw){ location.href='seller-login.html'; }
+const auth = JSON.parse(authRaw);
+document.getElementById('welcome').textContent = `Welcome, ${auth.name}`;
+document.getElementById('expires').textContent = `Access valid through ${auth.expires}`;
+
+// UI
+document.getElementById('signout').addEventListener('click', ()=>{
+  sessionStorage.removeItem('sellerAuth'); location.href='seller-login.html';
+});
+
+async function uploadBanner(file){
+  if(!file) return '';
+  const path = `sales/banners/${Date.now()}_${file.name}`;
+  const ref = storage.ref(path);
+  await ref.put(file);
+  return await ref.getDownloadURL();
+}
+
+document.getElementById('createSaleBtn').addEventListener('click', async ()=>{
+  const saleName = document.getElementById('saleName').value.trim();
+  const businessName = document.getElementById('businessName').value.trim();
+  const saleDesc = document.getElementById('saleDesc').value.trim();
+  const startDT = document.getElementById('startDT').value;
+  const endDT = document.getElementById('endDT').value;
+  const startTZ = document.getElementById('tzStart').value;
+  const endTZ = document.getElementById('tzEnd').value;
+  const file = document.getElementById('saleBanner').files[0];
+  const msg = document.getElementById('createSaleMsg');
+
+  if(!saleName || !businessName || !startDT || !endDT){ msg.textContent='Fill required fields'; return; }
+  try{
+    msg.textContent='Creating sale...';
+    const bannerUrl = await uploadBanner(file);
+    const saleObj = {
+      saleName, businessName, saleDesc, bannerUrl,
+      startLocal: startDT, endLocal: endDT, startTZ, endTZ,
+      sellerName: auth.name, createdAt: firebase.firestore.FieldValue.serverTimestamp(), status:'draft'
+    };
+    const docRef = await db.collection('sales').add(saleObj);
+    msg.textContent='Sale created. Opening sale editor...';
+    setTimeout(()=> location.href = `seller-sale.html?saleId=${docRef.id}`, 800);
+  }catch(err){
+    console.error('createSale err', err); msg.textContent='Error creating sale. See console.';
+  }
+});
+
+// show recent sales by this seller
+function listenSellerSales(){
+  db.collection('sales').where('sellerName','==',auth.name).orderBy('createdAt','desc').limit(20)
+    .onSnapshot(snap=>{
+      const div = document.getElementById('salesList'); div.innerHTML='';
+      snap.forEach(doc=>{
+        const d = doc.data();
+        const el = document.createElement('div');
+        el.style.padding='8px 0';
+        const status = d.status || 'draft';
+        el.innerHTML = `<div style="font-weight:600">${d.saleName||''}</div><div class="small muted">${status} • ${d.startLocal||''}</div>
+        <div style="margin-top:6px"><a href="seller-sale.html?saleId=${doc.id}">Open</a> • <a href="live.html?sale=${doc.id}" target="_blank">View Live</a></div>`;
+        div.appendChild(el);
+      });
+    }, err=> console.error('sales listen err', err));
+}
+listenSellerSales();
+</script>
+</body>
+</html>
