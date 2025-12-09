@@ -1,28 +1,58 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Caprock Livestock Exchange</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
 <style>
-    /* Brand colors & modern western fonts */
-    body { margin:0; font-family:'Oswald', sans-serif; background:#0D1B2A; color:#F7F2EC; }
-    h1 { text-align:center; margin-top:50px; font-size:3rem; color:#8A1E1E; }
-    .container { display:flex; justify-content:center; gap:50px; margin-top:100px; flex-wrap:wrap; }
-    .card { width:250px; height:250px; background:#F7F2EC; color:#0D1B2A; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:20px; box-shadow:0 4px 15px rgba(0,0,0,0.3); cursor:pointer; transition:transform 0.2s; }
-    .card:hover { transform:scale(1.05); }
-    .card h2 { margin:0; font-size:1.5rem; }
+:root{
+  --dusty:#F8F4EF;
+  --royal:#7A0A0A;
+  --navy:#0A1B3D;
+  --muted:#6f6b66;
+  --card:#ffffff;
+  font-family:Inter,system-ui,Arial;
+}
+html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--dusty),#efece8);color:var(--navy)}
+.header-white {background:white;padding:22px 0;border-bottom:1px solid #eee}
+.container{max-width:1100px;margin:24px auto;padding:18px}
+.brand-row{display:flex;align-items:center;gap:16px}
+.brand-title{font-family:'Playfair Display',serif;font-size:28px;color:var(--royal);margin:0}
+.subtitle{color:var(--muted);margin:0;font-size:14px}
+.grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin-top:30px}
+.tile{background:var(--card);border-radius:12px;padding:24px;box-shadow:0 12px 30px rgba(7,18,51,0.06);text-align:center;text-decoration:none;color:inherit;cursor:pointer}
+.tile:hover{transform:translateY(-6px)}
+.tile .icon{font-size:36px;margin-bottom:8px}
+.footer{margin:36px;text-align:center;color:var(--muted)}
 </style>
 </head>
 <body>
-<h1>Caprock Livestock Exchange</h1>
-<div class="container">
-    <div class="card" onclick="location.href='seller-login.html'">
-        <h2>Seller Board</h2>
+  <div class="header-white">
+    <div class="container brand-row">
+      <div>
+        <h1 class="brand-title">Caprock Livestock Exchange</h1>
+        <p class="subtitle">Real-time bidding • Seller tools</p>
+      </div>
     </div>
-    <div class="card" onclick="location.href='live.html'">
-        <h2>Live Bid Boards</h2>
+  </div>
+
+  <main class="container">
+    <div class="grid">
+      <a class="tile" href="seller-login.html" aria-label="Seller Portal">
+        <div class="icon">📋</div>
+        <div style="font-weight:600">Seller Portal</div>
+        <div style="color:var(--muted)">Create sales & manage lots</div>
+      </a>
+
+      <a class="tile" href="bid-boards.html" aria-label="Live Bid Boards">
+        <div class="icon">👀</div>
+        <div style="font-weight:600">Live Bid Boards</div>
+        <div style="color:var(--muted)">Browse active sales & bid</div>
+      </a>
     </div>
-</div>
+  </main>
+
+  <footer class="footer">© Caprock Livestock Exchange</footer>
 </body>
 </html>
