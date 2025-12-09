@@ -11,8 +11,9 @@ header { padding:20px; text-align:center; background:#8A1E1E; font-size:2rem; }
 input, select, button { display:block; margin-bottom:15px; padding:10px; border-radius:10px; border:none; width:100%; }
 button { background:#8A1E1E; color:#F7F2EC; cursor:pointer; }
 button:hover { background:#B22222; }
-.lot-preview { margin-bottom:20px; }
+#lotForm { display:none; }
 .lot-preview img { width:100%; max-width:300px; border-radius:10px; }
+#loginStatus { margin-bottom:15px; color:#FFCCCC; }
 </style>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -20,18 +21,25 @@ button:hover { background:#B22222; }
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 </head>
 <body>
-<header>Seller Portal</header>
+<header>Seller Portal Login</header>
 <div class="container">
-    <h2>Add New Lot</h2>
-    <input type="text" id="lotTitle" placeholder="Lot # | Ear Notch">
-    <input type="text" id="pedigree" placeholder="Pedigree">
-    <input type="text" id="breed" placeholder="Breed">
-    <input type="number" id="startPrice" placeholder="Starting Bid Price">
-    <input type="number" id="bidIncrement" placeholder="Bid Increment ($)">
-    <input type="file" id="lotImage">
-    <div class="lot-preview" id="lotPreview"></div>
-    <button id="addLotBtn">Add Lot</button>
-    <p id="statusMsg"></p>
+    <p id="loginStatus">Enter your credentials to access the portal.</p>
+    <input type="text" id="sellerName" placeholder="Your Name">
+    <input type="text" id="sellerCode" placeholder="Authentication Code">
+    <button id="unlockBtn">Login</button>
+
+    <div id="lotForm">
+        <h2>Add New Lot</h2>
+        <input type="text" id="lotTitle" placeholder="Lot # | Ear Notch">
+        <input type="text" id="pedigree" placeholder="Pedigree">
+        <input type="text" id="breed" placeholder="Breed">
+        <input type="number" id="startPrice" placeholder="Starting Bid Price">
+        <input type="number" id="bidIncrement" placeholder="Bid Increment ($)">
+        <input type="file" id="lotImage">
+        <div class="lot-preview" id="lotPreview"></div>
+        <button id="addLotBtn">Add Lot</button>
+        <p id="statusMsg"></p>
+    </div>
 </div>
 
 <script>
@@ -48,17 +56,58 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const storage = firebase.storage();
 
-const lotTitleInput = document.getElementById("lotTitle");
-const pedigreeInput = document.getElementById("pedigree");
-const breedInput = document.getElementById("breed");
-const startPriceInput = document.getElementById("startPrice");
-const bidIncrementInput = document.getElementById("bidIncrement");
+// Login system
+async function unlockSeller() {
+    const name = document.getElementById("sellerName").value.trim();
+    const code = document.getElementById("sellerCode").value.trim();
+    const infoBox = document.getElementById("loginStatus");
+
+    try {
+        const response = await fetch("./authorized.txt");
+        if (!response.ok) {
+            infoBox.textContent = "Error loading authorization file.";
+            return;
+        }
+
+        const text = await response.text();
+        const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+
+        let authenticated = false;
+
+        for (let i = 0; i < lines.length; i += 3) {
+            const userName = lines[i];
+            const expiration = lines[i + 1];
+            const accessCode = lines[i + 2];
+
+            if (name === userName && code === accessCode) {
+                const today = new Date().toISOString().split("T")[0];
+                if (today <= expiration) {
+                    authenticated = true;
+                    break;
+                } else {
+                    infoBox.textContent = "Your access has expired.";
+                    return;
+                }
+            }
+        }
+
+        if (authenticated) {
+            infoBox.textContent = `Welcome, ${name}!`;
+            document.getElementById("lotForm").style.display = "block";
+        } else {
+            infoBox.textContent = "Invalid credentials.";
+        }
+    } catch (error) {
+        infoBox.textContent = "Login system error.";
+        console.error(error);
+    }
+}
+
+document.getElementById("unlockBtn").addEventListener("click", unlockSeller);
+
+// Lot image preview
 const lotImageInput = document.getElementById("lotImage");
 const lotPreview = document.getElementById("lotPreview");
-const addLotBtn = document.getElementById("addLotBtn");
-const statusMsg = document.getElementById("statusMsg");
-
-// Preview image before upload
 lotImageInput.addEventListener("change", e => {
     const file = e.target.files[0];
     if (!file) return;
@@ -70,13 +119,14 @@ lotImageInput.addEventListener("change", e => {
 });
 
 // Add Lot to Firestore + Storage
-addLotBtn.addEventListener("click", async () => {
-    const title = lotTitleInput.value.trim();
-    const pedigree = pedigreeInput.value.trim();
-    const breed = breedInput.value.trim();
-    const startPrice = Number(startPriceInput.value);
-    const bidIncrement = Number(bidIncrementInput.value);
+document.getElementById("addLotBtn").addEventListener("click", async () => {
+    const title = document.getElementById("lotTitle").value.trim();
+    const pedigree = document.getElementById("pedigree").value.trim();
+    const breed = document.getElementById("breed").value.trim();
+    const startPrice = Number(document.getElementById("startPrice").value);
+    const bidIncrement = Number(document.getElementById("bidIncrement").value);
     const file = lotImageInput.files[0];
+    const statusMsg = document.getElementById("statusMsg");
 
     if (!title || !startPrice || !bidIncrement) {
         statusMsg.textContent = "Please fill all required fields.";
@@ -103,11 +153,11 @@ addLotBtn.addEventListener("click", async () => {
         });
 
         statusMsg.textContent = "Lot added successfully!";
-        lotTitleInput.value = "";
-        pedigreeInput.value = "";
-        breedInput.value = "";
-        startPriceInput.value = "";
-        bidIncrementInput.value = "";
+        document.getElementById("lotTitle").value = "";
+        document.getElementById("pedigree").value = "";
+        document.getElementById("breed").value = "";
+        document.getElementById("startPrice").value = "";
+        document.getElementById("bidIncrement").value = "";
         lotImageInput.value = "";
         lotPreview.innerHTML = "";
     } catch (err) {
