@@ -3,35 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Seller Dashboard - Caprock Livestock Exchange</title>
+<title>Seller Portal - Caprock Livestock</title>
 <style>
-    body { margin:0; font-family:'Oswald', sans-serif; background:#0D1B2A; color:#F7F2EC; }
-    header { padding:20px; text-align:center; background:#8A1E1E; font-size:2rem; }
-    .dashboard { padding:20px; display:flex; flex-direction:column; gap:20px; max-width:1200px; margin:auto; }
-    input, select, button { padding:10px; border-radius:10px; border:none; font-size:1rem; }
-    button { cursor:pointer; transition:background 0.2s; }
-    .btn-primary { background:#8A1E1E; color:#F7F2EC; }
-    .btn-primary:hover { background:#B22222; }
-    .lot-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:20px; margin-top:20px; }
-    .lot-card { background:#F7F2EC; color:#0D1B2A; padding:15px; border-radius:15px; box-shadow:0 4px 10px rgba(0,0,0,0.3); }
-    .lot-card img { width:100%; border-radius:10px; margin-bottom:10px; }
+body { font-family:'Oswald', sans-serif; background:#0D1B2A; color:#F7F2EC; margin:0; padding:0; }
+header { padding:20px; text-align:center; background:#8A1E1E; font-size:2rem; }
+.container { max-width:800px; margin:auto; padding:20px; }
+input, select, button { display:block; margin-bottom:15px; padding:10px; border-radius:10px; border:none; width:100%; }
+button { background:#8A1E1E; color:#F7F2EC; cursor:pointer; }
+button:hover { background:#B22222; }
+.lot-preview { margin-bottom:20px; }
+.lot-preview img { width:100%; max-width:300px; border-radius:10px; }
 </style>
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 </head>
 <body>
-<header>Seller Dashboard</header>
-<div class="dashboard">
-    <div>
-        <input type="text" id="saleTitle" placeholder="Sale Title">
-        <input type="text" id="lotTitle" placeholder="Lot Title">
-        <input type="number" id="startPrice" placeholder="Starting Price">
-        <input type="file" id="lotImage">
-        <button class="btn-primary" id="addLotBtn">Add Lot</button>
-    </div>
-
-    <div class="lot-grid" id="lotGrid"></div>
+<header>Seller Portal</header>
+<div class="container">
+    <h2>Add New Lot</h2>
+    <input type="text" id="lotTitle" placeholder="Lot # | Ear Notch">
+    <input type="text" id="pedigree" placeholder="Pedigree">
+    <input type="text" id="breed" placeholder="Breed">
+    <input type="number" id="startPrice" placeholder="Starting Bid Price">
+    <input type="number" id="bidIncrement" placeholder="Bid Increment ($)">
+    <input type="file" id="lotImage">
+    <div class="lot-preview" id="lotPreview"></div>
+    <button id="addLotBtn">Add Lot</button>
+    <p id="statusMsg"></p>
 </div>
 
 <script>
@@ -46,38 +46,74 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const storage = firebase.storage();
 
-let currentSaleId = "demoSale";
-const lotGrid = document.getElementById("lotGrid");
+const lotTitleInput = document.getElementById("lotTitle");
+const pedigreeInput = document.getElementById("pedigree");
+const breedInput = document.getElementById("breed");
+const startPriceInput = document.getElementById("startPrice");
+const bidIncrementInput = document.getElementById("bidIncrement");
+const lotImageInput = document.getElementById("lotImage");
+const lotPreview = document.getElementById("lotPreview");
+const addLotBtn = document.getElementById("addLotBtn");
+const statusMsg = document.getElementById("statusMsg");
 
-async function addLot() {
-    const lotTitle = document.getElementById("lotTitle").value;
-    const startPrice = Number(document.getElementById("startPrice").value);
-    if (!lotTitle || !startPrice) return alert("Please fill in all fields.");
+// Preview image before upload
+lotImageInput.addEventListener("change", e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        lotPreview.innerHTML = `<img src="${reader.result}" alt="Lot Image">`;
+    };
+    reader.readAsDataURL(file);
+});
 
-    const lotData = { title: lotTitle, startPrice, currentBid: startPrice, currentBidder: "", timestamp: Date.now() };
-    await db.collection("sales").doc(currentSaleId).collection("lots").add(lotData);
+// Add Lot to Firestore + Storage
+addLotBtn.addEventListener("click", async () => {
+    const title = lotTitleInput.value.trim();
+    const pedigree = pedigreeInput.value.trim();
+    const breed = breedInput.value.trim();
+    const startPrice = Number(startPriceInput.value);
+    const bidIncrement = Number(bidIncrementInput.value);
+    const file = lotImageInput.files[0];
 
-    document.getElementById("lotTitle").value = "";
-    document.getElementById("startPrice").value = "";
-}
+    if (!title || !startPrice || !bidIncrement) {
+        statusMsg.textContent = "Please fill all required fields.";
+        return;
+    }
 
-document.getElementById("addLotBtn").addEventListener("click", addLot);
+    try {
+        let imageURL = "";
+        if (file) {
+            const storageRef = storage.ref().child(`lots/${Date.now()}_${file.name}`);
+            await storageRef.put(file);
+            imageURL = await storageRef.getDownloadURL();
+        }
 
-db.collection("sales").doc(currentSaleId).collection("lots")
-  .onSnapshot(snapshot => {
-    lotGrid.innerHTML = "";
-    snapshot.forEach(doc => {
-        const lot = doc.data();
-        lotGrid.innerHTML += `
-            <div class="lot-card">
-                <h3>${lot.title}</h3>
-                <p>Starting: $${lot.startPrice}</p>
-                <p>Current Bid: $${lot.currentBid}</p>
-                <p>Bidder: ${lot.currentBidder || '—'}</p>
-            </div>
-        `;
-    });
+        await db.collection("sales").doc("demoSale").collection("lots").add({
+            title,
+            pedigree,
+            breed,
+            startPrice,
+            bidIncrement,
+            currentBid: null,
+            currentBidder: null,
+            imageURL: imageURL || ""
+        });
+
+        statusMsg.textContent = "Lot added successfully!";
+        lotTitleInput.value = "";
+        pedigreeInput.value = "";
+        breedInput.value = "";
+        startPriceInput.value = "";
+        bidIncrementInput.value = "";
+        lotImageInput.value = "";
+        lotPreview.innerHTML = "";
+    } catch (err) {
+        console.error(err);
+        statusMsg.textContent = "Error adding lot.";
+    }
 });
 </script>
 </body>
