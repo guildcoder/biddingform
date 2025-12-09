@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sale Editor — Caprock</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Inter:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root{--dusty:#F8F4EF;--royal:#7A0A0A;--navy:#0A1B3D;--muted:#6f6b66}
+body{margin:0;background:linear-gradient(180deg,var(--dusty),#efece8);color:var(--navy);font-family:Inter,system-ui,Arial}
+.header{background:var(--royal);color:white;padding:12px;text-align:center;font-family:'Playfair Display',serif}
+.container{max-width:1100px;margin:18px auto;padding:18px}
+.grid{display:grid;grid-template-columns:1fr 340px;gap:20px}
+.card{background:white;padding:16px;border-radius:12px;box-shadow:0 10px 24px rgba(7,18,51,0.06)}
+input,textarea,select,button{width:100%;padding:10px;border-radius:8px;border:1px solid #e6e3e0;margin-top:8px}
+.btn-primary{background:var(--royal);color:white;border:0;padding:10px;border-radius:8px;cursor:pointer}
+.lots{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:12px}
+.lot-card{background:linear-gradient(180deg,#fff,#fbfbfb);padding:10px;border-radius:10px;border:1px solid #eee}
+.small{font-size:0.9rem;color:var(--muted)}
+</style>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+</head>
+<body>
+<div class="header">Sale Editor — Caprock</div>
+<div class="container">
+  <div id="saleMeta" class="card small">Loading...</div>
+  <div class="grid">
+    <div class="card">
+      <h3>Add Lot</h3>
+      <input id="earNotch" placeholder="Lot # | Ear Notch">
+      <input id="breed" placeholder="Breed">
+      <textarea id="pedigree" placeholder="Pedigree (optional)"></textarea>
+      <input id="startingBid" type="number" placeholder="Starting bid ($)">
+      <input id="increment" type="number" placeholder="Bid increment ($)">
+      <input id="lotImage" type="file" accept="image/*">
+      <div id="preview" class="small"></div>
+      <button id="addLotBtn" class="btn-primary">Add Lot</button>
+      <p id="addLotMsg" class="small"></p>
+    </div>
+
+    <div class="card">
+      <h4>Controls</h4>
+      <div style="display:flex;gap:8px">
+        <button id="startSaleBtn" class="btn-primary">Start Sale</button>
+        <button id="pauseSaleBtn" style="background:#efefef;color:var(--navy)">Pause</button>
+      </div>
+      <button id="endSaleBtn" style="margin-top:8px;background:#efefef;color:var(--navy)">End Sale</button>
+      <div style="margin-top:12px">
+        <button id="copyLinkBtn" class="btn-primary">Copy Live Link</button>
+        <div id="liveLink" class="small" style="margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h4>Lots</h4>
+    <div id="lotsGrid" class="lots"></div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyALZBdsPYaEV9CfdzrOvJu10dlvdi4TeSE",
+  authDomain: "bid-board-6b84e.firebaseapp.com",
+  projectId: "bid-board-6b84e",
+  storageBucket: "bid-board-6b84e.firebasestorage.app",
+  messagingSenderId: "798947738973",
+  appId: "1:798947738973:web:024c3e6caff609aaf494b4",
+  measurementId: "G-P5XF72PEKF"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+// get saleId from query
+const params = new URLSearchParams(location.search);
+const saleId = params.get('saleId');
+if(!saleId){ alert('No saleId specified.'); location.href='seller-dashboard.html'; }
+
+async function loadSale(){
+  try{
+    const snap = await db.collection('sales').doc(saleId).get();
+    if(!snap.exists){ document.getElementById('saleMeta').textContent='Sale not found.'; return; }
+    const s = snap.data();
+    document.getElementById('saleMeta').innerHTML = `<div style="display:flex;gap:12px;align-items:center">
+      ${s.bannerUrl?`<img src="${s.bannerUrl}" style="height:70px;border-radius:8px;object-fit:cover;margin-right:8px">`:''}
+      <div><strong>${s.saleName}</strong><div class="small muted">${s.businessName}</div><div class="small muted">${s.startLocal} → ${s.endLocal}</div></div>
+    </div>`;
+    document.getElementById('liveLink').textContent = `${location.origin}/live.html?sale=${saleId}`;
+  }catch(err){ console.error('loadSale err',err); document.getElementById('saleMeta').textContent='Error loading sale.'; }
+}
+loadSale();
+
+function readPreview(file, target){
+  if(!file) { target.innerHTML=''; return; }
+  const r = new FileReader();
+  r.onload = ()=> target.innerHTML=`<img src="${r.result}" style="max-width:100%;border-radius:8px">`;
+  r.readAsDataURL(file);
+}
+document.getElementById('lotImage').addEventListener('change', (e)=> readPreview(e.target.files[0], document.getElementById('preview')));
+
+async function uploadFile(file, pathPrefix){
+  if(!file) return '';
+  const path = `${pathPrefix}/${Date.now()}_${file.name}`;
+  const ref = storage.ref(path);
+  await ref.put(file);
+  return await ref.getDownloadURL();
+}
+
+document.getElementById('addLotBtn').addEventListener('click', async ()=>{
+  const ear = document.getElementById('earNotch').value.trim();
+  const breed = document.getElementById('breed').value.trim();
+  const pedigree = document.getElementById('pedigree').value.trim();
+  const start = Number(document.getElementById('startingBid').value||0);
+  const inc = Number(document.getElementById('increment').value||0);
+  const file = document.getElementById('lotImage').files[0];
+  const msg = document.getElementById('addLotMsg');
+
+  if(!ear){ msg.textContent='Enter ear notch/lot title.'; return; }
+  msg.textContent='Saving lot...';
+
+  try{
+    const imageURL = file ? await uploadFile(file, `sales/${saleId}/lots`) : '';
+    // determine lotNumber (max + 1)
+    const qsnap = await db.collection('sales').doc(saleId).collection('lots').orderBy('lotNumber','desc').limit(1).get();
+    let next = 1;
+    if(!qsnap.empty){ next = (qsnap.docs[0].data().lotNumber||0) + 1; }
+    const lotObj = {
+      lotNumber: next, earNotch: ear, breed, pedigree,
+      startPrice: start, increment: inc || 50,
+      currentBid: null, currentBidder: null, imageURL: imageURL||'', createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    await db.collection('sales').doc(saleId).collection('lots').add(lotObj);
+    msg.textContent='Lot saved.';
+    document.getElementById('earNotch').value=''; document.getElementById('breed').value=''; document.getElementById('pedigree').value=''; document.getElementById('startingBid').value=''; document.getElementById('increment').value=''; document.getElementById('lotImage').value=''; document.getElementById('preview').innerHTML='';
+  }catch(err){ console.error('addLot err',err); msg.textContent='Error saving lot (see console).'; }
+});
+
+// live controls
+document.getElementById('startSaleBtn').addEventListener('click', ()=> updateSaleStatus('live'));
+document.getElementById('pauseSaleBtn').addEventListener('click', ()=> updateSaleStatus('paused'));
+document.getElementById('endSaleBtn').addEventListener('click', ()=> updateSaleStatus('ended'));
+document.getElementById('copyLinkBtn').addEventListener('click', ()=> {
+  const url = `${location.origin}/live.html?sale=${saleId}`; navigator.clipboard.writeText(url).then(()=> alert('Live link copied'));
+});
+
+async function updateSaleStatus(s){
+  try{ await db.collection('sales').doc(saleId).update({ status: s }); alert('Sale status updated'); }catch(err){ console.error('status update err',err); alert('Failed update (see console)'); }
+}
+
+// render lots realtime
+db.collection('sales').doc(saleId).collection('lots').orderBy('lotNumber','asc')
+  .onSnapshot(snap=>{
+    const grid = document.getElementById('lotsGrid'); grid.innerHTML='';
+    snap.forEach(d=>{
+      const data = d.data();
+      const el = document.createElement('div'); el.className='lot-card';
+      const imgHTML = data.imageURL ? `<img src="${data.imageURL}" style="width:100%;border-radius:6px;margin-bottom:8px">` : '';
+      el.innerHTML = `${imgHTML}<div style="font-weight:600">${data.lotNumber||''} ${data.earNotch||''}</div><div class="small muted">Breed: ${data.breed||''}</div><div style="margin-top:8px"><strong>${data.currentBid?('$'+data.currentBid):('Starting: $'+(data.startPrice||0))}</strong></div>`;
+      grid.appendChild(el);
+    });
+  }, err=> console.error('lots listen err',err));
+</script>
+</body>
+</html>
