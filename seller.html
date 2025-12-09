@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seller Dashboard - Caprock Livestock Exchange</title>
+<style>
+    body { margin:0; font-family:'Oswald', sans-serif; background:#0D1B2A; color:#F7F2EC; }
+    header { padding:20px; text-align:center; background:#8A1E1E; font-size:2rem; }
+    .dashboard { padding:20px; display:flex; flex-direction:column; gap:20px; max-width:1200px; margin:auto; }
+    input, select, button { padding:10px; border-radius:10px; border:none; font-size:1rem; }
+    button { cursor:pointer; transition:background 0.2s; }
+    .btn-primary { background:#8A1E1E; color:#F7F2EC; }
+    .btn-primary:hover { background:#B22222; }
+    .lot-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:20px; margin-top:20px; }
+    .lot-card { background:#F7F2EC; color:#0D1B2A; padding:15px; border-radius:15px; box-shadow:0 4px 10px rgba(0,0,0,0.3); }
+    .lot-card img { width:100%; border-radius:10px; margin-bottom:10px; }
+</style>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+<header>Seller Dashboard</header>
+<div class="dashboard">
+    <div>
+        <input type="text" id="saleTitle" placeholder="Sale Title">
+        <input type="text" id="lotTitle" placeholder="Lot Title">
+        <input type="number" id="startPrice" placeholder="Starting Price">
+        <input type="file" id="lotImage">
+        <button class="btn-primary" id="addLotBtn">Add Lot</button>
+    </div>
+
+    <div class="lot-grid" id="lotGrid"></div>
+</div>
+
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyCquC_ZsPf59yGnlFLzK8Du1mgibvKOK_M",
+    authDomain: "biddingapp-a6d8e.firebaseapp.com",
+    projectId: "biddingapp-a6d8e",
+    storageBucket: "biddingapp-a6d8e.firebasestorage.app",
+    messagingSenderId: "870014358891",
+    appId: "1:870014358891:web:b74cf577dfd38eff46e82e",
+    measurementId: "G-0QWG9DQCLG"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+let currentSaleId = "demoSale";
+const lotGrid = document.getElementById("lotGrid");
+
+async function addLot() {
+    const lotTitle = document.getElementById("lotTitle").value;
+    const startPrice = Number(document.getElementById("startPrice").value);
+    if (!lotTitle || !startPrice) return alert("Please fill in all fields.");
+
+    const lotData = { title: lotTitle, startPrice, currentBid: startPrice, currentBidder: "", timestamp: Date.now() };
+    await db.collection("sales").doc(currentSaleId).collection("lots").add(lotData);
+
+    document.getElementById("lotTitle").value = "";
+    document.getElementById("startPrice").value = "";
+}
+
+document.getElementById("addLotBtn").addEventListener("click", addLot);
+
+db.collection("sales").doc(currentSaleId).collection("lots")
+  .onSnapshot(snapshot => {
+    lotGrid.innerHTML = "";
+    snapshot.forEach(doc => {
+        const lot = doc.data();
+        lotGrid.innerHTML += `
+            <div class="lot-card">
+                <h3>${lot.title}</h3>
+                <p>Starting: $${lot.startPrice}</p>
+                <p>Current Bid: $${lot.currentBid}</p>
+                <p>Bidder: ${lot.currentBidder || '—'}</p>
+            </div>
+        `;
+    });
+});
+</script>
+</body>
+</html>
