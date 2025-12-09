@@ -1,67 +1,78 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Seller Login - Caprock Livestock Exchange</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Seller Login — Caprock</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Inter:wght@300;400&display=swap" rel="stylesheet">
 <style>
-    body { margin:0; font-family:'Oswald', sans-serif; background:#0D1B2A; color:#F7F2EC; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; }
-    h1 { color:#8A1E1E; }
-    .login-container { display:flex; flex-direction:column; gap:15px; background:#F7F2EC; color:#0D1B2A; padding:40px; border-radius:20px; box-shadow:0 4px 15px rgba(0,0,0,0.3); min-width:300px; }
-    input { padding:10px; border-radius:10px; border:none; font-size:1rem; width:100%; }
-    button { padding:10px; border-radius:10px; border:none; font-size:1rem; cursor:pointer; background:#8A1E1E; color:#F7F2EC; transition:background 0.2s; }
-    button:hover { background:#B22222; }
-    #loginStatus { color:#8A1E1E; text-align:center; margin-top:10px; }
+:root{--dusty:#F8F4EF;--royal:#7A0A0A;--navy:#0A1B3D;--muted:#6f6b66;font-family:Inter,system-ui,Arial}
+body{margin:0;background:linear-gradient(180deg,var(--dusty),#efece8);color:var(--navy);display:flex;align-items:center;justify-content:center;min-height:100vh}
+.card{background:white;padding:28px;border-radius:12px;box-shadow:0 10px 30px rgba(7,18,51,0.06);width:100%;max-width:520px}
+h1{font-family:'Playfair Display',serif;color:var(--royal);margin:0 0 6px}
+.muted{color:var(--muted)}
+.form{display:grid;gap:10px;margin-top:12px}
+input{padding:10px;border-radius:8px;border:1px solid #e6e3e0}
+button{padding:10px;border-radius:8px;border:0;background:var(--royal);color:white;cursor:pointer}
+.small{font-size:0.9rem;color:var(--muted)}
+#loginStatus{color:#7A0A0A;margin-top:6px}
 </style>
 </head>
 <body>
-<h1>Seller Login</h1>
-<div class="login-container">
-    <input type="text" id="sellerName" placeholder="Enter Name">
-    <input type="text" id="sellerCode" placeholder="Enter Access Code">
-    <button id="unlockBtn">Unlock</button>
-    <div id="loginStatus"></div>
-</div>
+  <div class="card">
+    <h1>Seller Portal — Sign in</h1>
+    <div class="small muted">Enter the name and access code provided by Caprock staff.</div>
+
+    <div class="form">
+      <input id="sellerName" placeholder="Full name (e.g. Luke C)">
+      <input id="sellerCode" placeholder="Access code (e.g. LC2468)">
+      <div style="display:flex;gap:8px">
+        <button id="unlockBtn">Unlock</button>
+        <button id="clearBtn" style="background:#efefef;color:var(--navy)">Clear</button>
+      </div>
+      <div id="loginStatus" class="small">Status: waiting...</div>
+      <div class="small muted">Note: authorized.txt must exist in repo root in the 3-line format.</div>
+    </div>
+  </div>
 
 <script>
-async function unlockSeller() {
-    const name = document.getElementById("sellerName").value.trim();
-    const code = document.getElementById("sellerCode").value.trim();
-    const infoBox = document.getElementById("loginStatus");
+// helper normalizer
+const n=(s)=> (s||'').toString().trim().toLowerCase();
 
-    try {
-        const response = await fetch("./authorized.txt");
-        if (!response.ok) {
-            infoBox.textContent = "Error loading authorization file.";
-            return;
-        }
-        const text = await response.text();
-        const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+async function unlockSeller(){
+  const name = document.getElementById('sellerName').value;
+  const code = document.getElementById('sellerCode').value;
+  const status = document.getElementById('loginStatus');
+  status.textContent = 'Checking...';
+  if(!name||!code){ status.textContent='Please enter name and code.'; return; }
 
-        for (let i = 0; i < lines.length; i += 3) {
-            const userName = lines[i];
-            const expiration = lines[i + 1];
-            const accessCode = lines[i + 2];
-
-            if (name === userName && code === accessCode) {
-                const today = new Date().toISOString().split("T")[0];
-                if (today <= expiration) {
-                    window.location.href = "seller.html";
-                    return;
-                } else {
-                    infoBox.textContent = "Your access has expired.";
-                    return;
-                }
-            }
-        }
-        infoBox.textContent = "Invalid credentials.";
-    } catch (error) {
-        infoBox.textContent = "Login system error.";
-        console.error(error);
+  try{
+    const r = await fetch('./authorized.txt',{cache:'no-store'});
+    if(!r.ok){ status.textContent = 'Unable to load authorized.txt'; console.error('fetch failed', r.status); return; }
+    const txt = await r.text();
+    const lines = txt.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
+    let matched=null;
+    for(let i=0;i<lines.length;i+=3){
+      const uName=lines[i]||'', uExp=lines[i+1]||'', uCode=lines[i+2]||'';
+      if(n(uName)===n(name) && n(uCode)===n(code)){ matched={name:uName,expires:uExp,code:uCode}; break; }
     }
+    if(!matched){ status.textContent='Invalid credentials.'; console.warn('login failed for',name); return; }
+    const today = new Date().toISOString().split('T')[0];
+    if(today > matched.expires){ status.textContent=`Access expired ${matched.expires}`; return; }
+    // save session token
+    const token = { name: matched.name, expires: matched.expires, code: matched.code, ts: Date.now() };
+    sessionStorage.setItem('sellerAuth', JSON.stringify(token));
+    status.textContent = `Welcome, ${matched.name}. Redirecting...`;
+    setTimeout(()=> location.href='seller-dashboard.html', 700);
+  }catch(err){
+    status.textContent='Login error (see console).';
+    console.error('unlockSeller error', err);
+  }
 }
 
-document.getElementById("unlockBtn").addEventListener("click", unlockSeller);
+document.getElementById('unlockBtn').addEventListener('click', unlockSeller);
+document.getElementById('clearBtn').addEventListener('click', ()=> {
+  document.getElementById('sellerName').value=''; document.getElementById('sellerCode').value=''; document.getElementById('loginStatus').textContent='Status: cleared';
+});
 </script>
 </body>
 </html>
