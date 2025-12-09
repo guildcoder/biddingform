@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live Bid Boards — Caprock</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Inter:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root{--dusty:#F8F4EF;--royal:#7A0A0A;--navy:#0A1B3D;--muted:#6f6b66}
+body{margin:0;background:linear-gradient(180deg,var(--dusty),#efece8);color:var(--navy);font-family:Inter,system-ui,Arial}
+.header-white{background:white;padding:18px;border-bottom:1px solid #eee}
+.container{max-width:1100px;margin:18px auto;padding:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.card{background:white;padding:12px;border-radius:10px;box-shadow:0 10px 24px rgba(7,18,51,0.06)}
+.card img{width:100%;height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px;cursor:pointer}
+.badge{display:inline-block;padding:6px 8px;border-radius:8px;background:#efefef;color:var(--navy);font-weight:600}
+.status-live{background:#e74c3c;color:white;padding:6px 8px;border-radius:8px}
+.small{font-size:0.9rem;color:var(--muted)}
+</style>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <div class="header-white">
+    <div class="container">
+      <h1 style="margin:0;font-family:'Playfair Display',serif;color:#7A0A0A">Live Bid Boards</h1>
+      <div class="small" style="margin-top:6px;color:#6f6b66">Click any sale to open its live bidding page.</div>
+    </div>
+  </div>
+
+  <main class="container">
+    <div id="grid" class="grid"></div>
+  </main>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyALZBdsPYaEV9CfdzrOvJu10dlvdi4TeSE",
+  authDomain: "bid-board-6b84e.firebaseapp.com",
+  projectId: "bid-board-6b84e",
+  storageBucket: "bid-board-6b84e.firebasestorage.app",
+  messagingSenderId: "798947738973",
+  appId: "1:798947738973:web:024c3e6caff609aaf494b4",
+  measurementId: "G-P5XF72PEKF"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+function statusForSale(s, start, end){
+  try{
+    const now = new Date();
+    const st = start ? new Date(start) : null;
+    const ed = end ? new Date(end) : null;
+    if(st && now < st) return 'upcoming';
+    if(ed && now > ed) return 'closed';
+    return 'live';
+  }catch(e){ return s || 'unknown'; }
+}
+
+db.collection('sales').orderBy('createdAt','desc').onSnapshot(snap=>{
+  const grid = document.getElementById('grid'); grid.innerHTML='';
+  snap.forEach(doc=>{
+    const d = doc.data();
+    const st = statusForSale(d.status, d.startLocal, d.endLocal);
+    const card = document.createElement('div'); card.className='card';
+    const img = d.bannerUrl? `<img src="${d.bannerUrl}" alt="banner">` : '';
+    const statBadge = st==='live' ? `<span class="status-live">LIVE</span>` : `<span class="badge">${st.toUpperCase()}</span>`;
+    card.innerHTML = `${img}<div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:600">${d.saleName||''}</div>${statBadge}</div><div class="small muted" style="margin-top:6px">${d.businessName||''}</div><div style="margin-top:10px"><a href="live.html?sale=${doc.id}">Open Live</a></div>`;
+    grid.appendChild(card);
+  });
+}, err=> console.error('sales listen err', err));
+</script>
+</body>
+</html>
