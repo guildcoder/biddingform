@@ -1,195 +1,246 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Live Bidding - Caprock Livestock Exchange</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live Sale — Caprock</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Inter:wght@300;400&display=swap" rel="stylesheet">
 <style>
-    body { margin:0; font-family:'Oswald', sans-serif; background:#0D1B2A; color:#F7F2EC; }
-    header { padding:20px; text-align:center; background:#8A1E1E; font-size:2rem; }
-    .lot-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:20px; padding:20px; max-width:1200px; margin:auto; }
-    .lot-card { background:#F7F2EC; color:#0D1B2A; padding:15px; border-radius:15px; box-shadow:0 4px 10px rgba(0,0,0,0.3); text-align:center; cursor:pointer; }
-    .lot-card img { width:100%; border-radius:10px; margin-bottom:10px; transition:transform 0.2s; }
-    .lot-card img:hover { transform:scale(1.05); }
-    .bid-button { padding:10px; border:none; border-radius:10px; cursor:pointer; background:#8A1E1E; color:#F7F2EC; transition:background 0.2s; }
-    .bid-button:hover { background:#B22222; }
-
-    /* Bid Modal styles */
-    .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; z-index:10; }
-    .modal-content { background:#F7F2EC; color:#0D1B2A; padding:20px; border-radius:20px; width:90%; max-width:400px; text-align:center; position:relative; }
-    .close { position:absolute; top:10px; right:15px; font-size:1.5rem; cursor:pointer; }
-    input { padding:10px; border-radius:10px; border:none; margin-bottom:10px; width:80%; }
-    button { padding:10px; border-radius:10px; border:none; font-size:1rem; cursor:pointer; }
-
-    /* Image Modal */
-    #imageModal img { max-width:90%; max-height:90%; border-radius:15px; }
+:root{--dusty:#F8F4EF;--royal:#7A0A0A;--navy:#0A1B3D;--muted:#6f6b66}
+body{margin:0;background:linear-gradient(180deg,var(--dusty),#efece8);color:var(--navy);font-family:Inter,system-ui,Arial}
+.header-white{background:white;padding:18px;border-bottom:1px solid #eee}
+.container{max-width:1100px;margin:18px auto;padding:18px}
+.sale-banner{display:flex;gap:12px;align-items:center}
+.sale-banner img{height:90px;border-radius:8px;object-fit:cover}
+.controls{display:flex;gap:8px;align-items:center;margin-top:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-top:16px}
+.card{background:white;padding:12px;border-radius:10px;box-shadow:0 10px 24px rgba(7,18,51,0.06)}
+.card img{width:100%;height:160px;object-fit:cover;border-radius:8px;cursor:pointer}
+.btn{padding:8px;border-radius:8px;border:0;cursor:pointer}
+.btn-primary{background:var(--royal);color:white}
+.small{font-size:0.9rem;color:var(--muted)}
+.modal{display:none;position:fixed;inset:0;background:rgba(3,6,20,0.6);align-items:center;justify-content:center;z-index:999}
+.modal .box{background:white;padding:18px;border-radius:12px;width:92%;max-width:420px}
 </style>
-<!-- Firebase SDK -->
+<!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 </head>
 <body>
-<header>Live Bidding Board</header>
-<div class="lot-grid" id="lotGrid"></div>
-
-<!-- Bid Modal -->
-<div class="modal" id="bidModal">
-    <div class="modal-content">
-        <span class="close" id="closeModal">&times;</span>
-        <h2 id="modalLotTitle"></h2>
-        <img id="modalLotImage" src="" alt="" style="max-width:100%; border-radius:10px; margin-bottom:10px;">
-        <p>Current Bid: $<span id="modalCurrentBid"></span></p>
-        <input type="text" id="bidderName" placeholder="Your Name">
-        <input type="text" id="bidderPhone" placeholder="Last 4 Digits of Phone">
-        <input type="number" id="bidAmount" placeholder="Enter Your Bid">
-        <button id="submitBidBtn" class="bid-button">Submit Bid</button>
-        <p id="bidError" style="color:red;"></p>
+  <div class="header-white">
+    <div class="container">
+      <div id="saleHeader" class="sale-banner">Loading sale...</div>
+      <div id="saleTimes" class="small"></div>
     </div>
-</div>
+  </div>
 
-<!-- Image Modal -->
-<div class="modal" id="imageModal">
-    <div class="modal-content">
-        <span class="close" id="closeImageModal">&times;</span>
-        <img id="enlargedImage" src="" alt="">
+  <main class="container">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <h2 id="saleTitle"></h2>
+        <div id="saleDesc" class="small muted"></div>
+      </div>
+      <div>
+        <button id="getNumberBtn" class="btn btn-primary">Get Bidding Number</button>
+      </div>
     </div>
-</div>
+
+    <div id="grid" class="grid"></div>
+  </main>
+
+  <!-- Bidder Modal -->
+  <div id="bidderModal" class="modal">
+    <div class="box">
+      <h3>Get Bidding Number</h3>
+      <input id="bName" placeholder="Full name" style="width:100%;padding:10px;border-radius:8px;border:1px solid #e6e3e0;margin-top:8px">
+      <input id="bPhone" placeholder="Phone (full, digits)" style="width:100%;padding:10px;border-radius:8px;border:1px solid #e6e3e0;margin-top:8px">
+      <input id="bEmail" placeholder="Email (optional)" style="width:100%;padding:10px;border-radius:8px;border:1px solid #e6e3e0;margin-top:8px">
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button id="createBidderBtn" class="btn btn-primary">Request Number</button>
+        <button id="closeBidderBtn" class="btn" style="background:#efefef">Cancel</button>
+      </div>
+      <p id="bidderMsg" class="small" style="margin-top:8px;color:#7A0A0A"></p>
+    </div>
+  </div>
+
+  <!-- Bid Modal -->
+  <div id="bidModal" class="modal">
+    <div class="box" id="bidBox"></div>
+  </div>
 
 <script>
 const firebaseConfig = {
-    apiKey: "AIzaSyCquC_ZsPf59yGnlFLzK8Du1mgibvKOK_M",
-    authDomain: "biddingapp-a6d8e.firebaseapp.com",
-    projectId: "biddingapp-a6d8e",
-    storageBucket: "biddingapp-a6d8e.firebasestorage.app",
-    messagingSenderId: "870014358891",
-    appId: "1:870014358891:web:b74cf577dfd38eff46e82e",
-    measurementId: "G-0QWG9DQCLG"
+  apiKey: "AIzaSyALZBdsPYaEV9CfdzrOvJu10dlvdi4TeSE",
+  authDomain: "bid-board-6b84e.firebaseapp.com",
+  projectId: "bid-board-6b84e",
+  storageBucket: "bid-board-6b84e.firebasestorage.app",
+  messagingSenderId: "798947738973",
+  appId: "1:798947738973:web:024c3e6caff609aaf494b4",
+  measurementId: "G-P5XF72PEKF"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 const storage = firebase.storage();
 
-let currentSaleId = "demoSale"; 
-const lotGrid = document.getElementById("lotGrid");
+const params = new URLSearchParams(location.search);
+const saleId = params.get('sale');
+if(!saleId){ alert('Sale not specified'); location.href='bid-boards.html'; }
 
-// Modals
-const bidModal = document.getElementById("bidModal");
-const closeModal = document.getElementById("closeModal");
-const modalLotTitle = document.getElementById("modalLotTitle");
-const modalCurrentBid = document.getElementById("modalCurrentBid");
-const modalLotImage = document.getElementById("modalLotImage");
-const bidderNameInput = document.getElementById("bidderName");
-const bidderPhoneInput = document.getElementById("bidderPhone");
-const bidAmountInput = document.getElementById("bidAmount");
-const submitBidBtn = document.getElementById("submitBidBtn");
-const bidError = document.getElementById("bidError");
-let selectedLotId = null;
-let currentLotData = null;
+const grid = document.getElementById('grid');
+const saleHeader = document.getElementById('saleHeader');
+const saleTitle = document.getElementById('saleTitle');
+const saleDesc = document.getElementById('saleDesc');
+const saleTimes = document.getElementById('saleTimes');
 
-// Image Modal
-const imageModal = document.getElementById("imageModal");
-const enlargedImage = document.getElementById("enlargedImage");
-const closeImageModal = document.getElementById("closeImageModal");
-closeImageModal.onclick = () => imageModal.style.display = "none";
+const bidderModal = document.getElementById('bidderModal');
+const closeBidderBtn = document.getElementById('closeBidderBtn');
+const getNumberBtn = document.getElementById('getNumberBtn');
+const createBidderBtn = document.getElementById('createBidderBtn');
+const bidderMsg = document.getElementById('bidderMsg');
 
-// Open bid modal
-function openBidModal(lotId, lotData) {
-    selectedLotId = lotId;
-    currentLotData = lotData;
-    modalLotTitle.textContent = lotData.title;
-    modalCurrentBid.textContent = lotData.currentBid || lotData.startPrice;
-    modalLotImage.src = lotData.imageURL || "";
-    bidAmountInput.value = '';
-    bidderNameInput.value = '';
-    bidderPhoneInput.value = '';
-    bidError.textContent = '';
-    bidModal.style.display = "flex";
+const bidModal = document.getElementById('bidModal');
+const bidBox = document.getElementById('bidBox');
+
+getNumberBtn.addEventListener('click', ()=> bidderModal.style.display='flex');
+closeBidderBtn.addEventListener('click', ()=> bidderModal.style.display='none');
+
+// load sale meta
+async function loadSale(){
+  try{
+    const s = await db.collection('sales').doc(saleId).get();
+    if(!s.exists){ alert('Sale not found'); location.href='bid-boards.html'; return; }
+    const data = s.data();
+    saleTitle.textContent = data.saleName || '';
+    saleDesc.textContent = data.saleDesc || '';
+    saleTimes.textContent = `${data.startLocal || ''}  →  ${data.endLocal || ''}`;
+    saleHeader.innerHTML = `${data.bannerUrl?`<img src="${data.bannerUrl}" alt="banner">`:''}<div><strong>${data.saleName}</strong><div class="small muted">${data.businessName||''}</div></div>`;
+  }catch(err){ console.error('loadSale err',err); }
 }
+loadSale();
 
-// Close bid modal
-closeModal.onclick = () => bidModal.style.display = "none";
-window.onclick = e => { 
-    if (e.target == bidModal) bidModal.style.display = "none"; 
-    if (e.target == imageModal) imageModal.style.display = "none"; 
-};
+// create unique 5-digit bidder number (transaction: ensure not used)
+async function createBidder(){
+  const name = document.getElementById('bName').value.trim();
+  const phone = document.getElementById('bPhone').value.trim();
+  const email = document.getElementById('bEmail').value.trim();
+  bidderMsg.textContent='';
 
-// Render lots
-function renderLots(lots) {
-    lotGrid.innerHTML = "";
-    lots.forEach(doc => {
-        const lot = doc.data();
-        const div = document.createElement("div");
-        div.className = "lot-card";
-        const imgHTML = lot.imageURL ? `<img src="${lot.imageURL}" alt="${lot.title}" class="lotImg">` : '';
-        div.innerHTML = `
-            ${imgHTML}
-            <h3>${lot.title}</h3>
-            <p>Current Bid: $${lot.currentBid || lot.startPrice}</p>
-            <p>Bidder: ${lot.currentBidder || "—"}</p>
-            <button class="bid-button">Bid on me!</button>
-        `;
-        const btn = div.querySelector("button");
-        btn.onclick = () => openBidModal(doc.id, lot);
-
-        // Image click to enlarge
-        if (lot.imageURL) {
-            div.querySelector(".lotImg").onclick = () => {
-                enlargedImage.src = lot.imageURL;
-                imageModal.style.display = "flex";
-            };
-        }
-
-        lotGrid.appendChild(div);
-    });
-}
-
-// Real-time listener
-db.collection("sales").doc(currentSaleId).collection("lots")
-  .onSnapshot(snapshot => {
-      const lots = [];
-      snapshot.forEach(doc => {
-          lots.push({ id: doc.id, ...doc.data() });
-      });
-      renderLots(lots);
-  });
-
-// Submit bid
-submitBidBtn.onclick = async () => {
-    const name = bidderNameInput.value.trim();
-    const phone = bidderPhoneInput.value.trim();
-    const bidAmount = Number(bidAmountInput.value);
-
-    if (!name || !phone || !bidAmount) {
-        bidError.textContent = "Fill all fields.";
-        return;
-    }
-
-    const minIncrement = 50; 
-    const currentBid = currentLotData.currentBid || currentLotData.startPrice;
-
-    if (bidAmount <= currentBid || ((bidAmount - currentBid) % minIncrement !== 0)) {
-        bidError.textContent = `Bid must be above current bid and in $${minIncrement} increments.`;
-        return;
-    }
-
-    try {
-        const lotRef = db.collection("sales").doc(currentSaleId).collection("lots").doc(selectedLotId);
-        await db.runTransaction(async transaction => {
-            const lotDoc = await transaction.get(lotRef);
-            const latestBid = lotDoc.data().currentBid || lotDoc.data().startPrice;
-            if (bidAmount <= latestBid) throw "Bid too low.";
-            transaction.update(lotRef, {
-                currentBid: bidAmount,
-                currentBidder: `${name} (${phone})`,
-                lastBidTime: Date.now()
-            });
+  if(!name || !phone){ bidderMsg.textContent='Name and phone required.'; return; }
+  try{
+    // generate random 5-digit then try transactionally to create doc with that number as field 'bidNumber'
+    let bidderDocRef;
+    let attempts=0;
+    while(attempts<6){
+      const num = Math.floor(10000 + Math.random()*90000).toString();
+      const q = await db.collection('sales').doc(saleId).collection('bidders').where('bidNumber','==',num).get();
+      if(q.empty){
+        // safe to create
+        const docRef = await db.collection('sales').doc(saleId).collection('bidders').add({
+          name, phone, email, bidNumber: num, createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-        bidModal.style.display = "none";
-    } catch (err) {
-        bidError.textContent = err;
+        bidderMsg.textContent = `Your bidder number: ${num} — saved. Use this when bidding.`;
+        // keep number in session for convenience
+        sessionStorage.setItem(`bidder_${saleId}`, JSON.stringify({ name, phone, email, bidNumber:num }));
+        setTimeout(()=> bidderModal.style.display='none', 900);
+        return;
+      }
+      attempts++;
     }
+    bidderMsg.textContent='Unable to generate bidder number. Try again.';
+  }catch(err){ console.error('createBidder err',err); bidderMsg.textContent='Error creating bidder (see console).'; }
+}
+
+createBidderBtn.addEventListener('click', createBidder);
+
+// render lots live
+db.collection('sales').doc(saleId).collection('lots').orderBy('lotNumber','asc')
+  .onSnapshot(snapshot=>{
+    const arr=[]; snapshot.forEach(s=> arr.push({ id: s.id, ...s.data() }));
+    renderLots(arr);
+  }, err=> console.error('lots listen err',err));
+
+function renderLots(lots){
+  grid.innerHTML='';
+  lots.forEach(lot=>{
+    const el = document.createElement('div'); el.className='card';
+    const imgHTML = lot.imageURL ? `<img src="${lot.imageURL}" alt="lot" onclick="openImage('${lot.imageURL}')">` : '';
+    const curr = lot.currentBid || lot.startPrice || 0;
+    el.innerHTML = `${imgHTML}<div style="font-weight:600">${lot.lotNumber||''} ${lot.earNotch||''}</div><div class="small muted">Breed: ${lot.breed||''}</div><div style="margin-top:8px"><strong>$${curr}</strong></div><div style="margin-top:8px"><button class="btn btn-primary" onclick='openBid("${lot.id}")'>Bid on this lot</button></div>`;
+    grid.appendChild(el);
+  });
+}
+
+// open image in modal
+window.openImage = (url)=> {
+  bidBox.innerHTML = `<div style="text-align:center"><img src="${url}" style="max-width:100%;height:auto;border-radius:8px"><div style="margin-top:12px"><button class="btn" onclick="closeBidModal()">Close</button></div></div>`;
+  bidModal.style.display='flex';
 };
+
+// open bid form
+async function openBid(lotId){
+  const lotSnap = await db.collection('sales').doc(saleId).collection('lots').doc(lotId).get();
+  if(!lotSnap.exists){ alert('Lot missing'); return; }
+  const lot = lotSnap.data();
+  const curr = lot.currentBid || lot.startPrice || 0;
+  const inc = lot.increment || 50;
+  bidBox.innerHTML = `
+    <h3 style="margin:0">${lot.lotNumber||''} ${lot.earNotch||''}</h3>
+    ${lot.imageURL?`<img src="${lot.imageURL}" style="max-width:100%;height:auto;border-radius:8px;margin-top:8px">`:''}
+    <p class="small muted">Current: $${curr} • Increment: $${inc}</p>
+    <input id="bidNumberInput" placeholder="Your bidder number (5 digits)" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6e3e0;margin-top:8px">
+    <input id="bidPhone4" placeholder="Last 4 digits of phone" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6e3e0;margin-top:8px">
+    <input id="bidValue" type="number" placeholder="Enter bid amount (must exceed current and respect increment)" style="width:100%;padding:8px;border-radius:8px;border:1px solid #e6e3e0;margin-top:8px">
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button id="placeBidBtn" class="btn btn-primary">Place Bid</button>
+      <button class="btn" onclick="closeBidModal()">Cancel</button>
+    </div>
+    <p id="bidErr" class="small" style="color:#7A0A0A;margin-top:8px"></p>
+  `;
+  bidModal.style.display='flex';
+
+  document.getElementById('placeBidBtn').onclick = async () => {
+    const num = document.getElementById('bidNumberInput').value.trim();
+    const phone4 = document.getElementById('bidPhone4').value.trim();
+    const value = Number(document.getElementById('bidValue').value);
+    const errEl = document.getElementById('bidErr');
+    errEl.textContent='';
+
+    if(!/^\d{5}$/.test(num)){ errEl.textContent='Enter valid 5-digit bidder number.'; return; }
+    if(!/^\d{3,4}$/.test(phone4)){ errEl.textContent='Enter last 3-4 digits of phone.'; return; }
+    if(!value){ errEl.textContent='Enter bid amount.'; return; }
+
+    // verify bidder exists & phone matches last digits
+    const qb = await db.collection('sales').doc(saleId).collection('bidders').where('bidNumber','==',num).limit(1).get();
+    if(qb.empty){ errEl.textContent='Bidder number not found.'; return; }
+    const bdata = qb.docs[0].data();
+    const lastDigits = (bdata.phone||'').toString().slice(-4);
+    if(!lastDigits.endsWith(phone4)){ errEl.textContent='Phone digits do not match our records.'; return; }
+
+    // run transaction to place bid
+    const lotRef = db.collection('sales').doc(saleId).collection('lots').doc(lotId);
+    try{
+      await db.runTransaction(async tx=>{
+        const snap = await tx.get(lotRef);
+        if(!snap.exists) throw new Error('Lot missing');
+        const latest = snap.data().currentBid || snap.data().startPrice || 0;
+        const increment = snap.data().increment || inc;
+        if(value <= latest) throw new Error('Bid must exceed current bid');
+        if(((value - latest) % increment) !== 0) throw new Error(`Bid must be in ${increment} increments`);
+        tx.update(lotRef, { currentBid: value, currentBidder: `${num}`, lastBidTime: firebase.firestore.FieldValue.serverTimestamp() });
+        // add to bidHistory subcollection
+        const histRef = db.collection('sales').doc(saleId).collection('lots').doc(lotId).collection('bidHistory').doc();
+        tx.set(histRef, { bidderNumber: num, amount: value, timestamp: firebase.firestore.FieldValue.serverTimestamp(), bidderName: bdata.name || '' });
+      });
+      closeBidModal();
+    }catch(err){ console.error('placeBid err',err); errEl.textContent = err.message || String(err); }
+  };
+}
+
+function closeBidModal(){ bidModal.style.display='none'; bidBox.innerHTML=''; }
+
+// close bidder modal if click outside
+bidderModal.addEventListener('click', (e)=> { if(e.target===bidderModal) bidderModal.style.display='none'; });
+bidModal.addEventListener('click', (e)=> { if(e.target===bidModal) closeBidModal(); });
 </script>
 </body>
 </html>
