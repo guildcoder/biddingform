@@ -34,8 +34,6 @@ input,textarea,select,button{width:100%;padding:10px;border-radius:8px;border:1p
       <textarea id="pedigree" placeholder="Pedigree (optional)"></textarea>
       <input id="startingBid" type="number" placeholder="Starting bid ($)">
       <input id="increment" type="number" placeholder="Bid increment ($)">
-      <input id="lotImage" type="file" accept="image/*">
-      <div id="preview" class="small"></div>
       <button id="addLotBtn" class="btn-primary">Add Lot</button>
       <p id="addLotMsg" class="small"></p>
     </div>
@@ -85,7 +83,6 @@ async function loadSale(){
     if(!snap.exists){ document.getElementById('saleMeta').textContent='Sale not found.'; return; }
     const s = snap.data();
     document.getElementById('saleMeta').innerHTML = `<div style="display:flex;gap:12px;align-items:center">
-      ${s.bannerUrl?`<img src="${s.bannerUrl}" style="height:70px;border-radius:8px;object-fit:cover;margin-right:8px">`:''}
       <div><strong>${s.saleName}</strong><div class="small muted">${s.businessName}</div><div class="small muted">${s.startLocal} → ${s.endLocal}</div></div>
     </div>`;
     document.getElementById('liveLink').textContent = `${location.origin}/live.html?sale=${saleId}`;
