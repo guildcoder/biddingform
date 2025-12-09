@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Bidding - Caprock Livestock Exchange</title>
+<style>
+    body { margin:0; font-family:'Oswald', sans-serif; background:#0D1B2A; color:#F7F2EC; }
+    header { padding:20px; text-align:center; background:#8A1E1E; font-size:2rem; }
+    .lot-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:20px; padding:20px; max-width:1200px; margin:auto; }
+    .lot-card { background:#F7F2EC; color:#0D1B2A; padding:15px; border-radius:15px; box-shadow:0 4px 10px rgba(0,0,0,0.3); text-align:center; cursor:pointer; }
+    .lot-card img { width:100%; border-radius:10px; margin-bottom:10px; transition:transform 0.2s; }
+    .lot-card img:hover { transform:scale(1.05); }
+    .bid-button { padding:10px; border:none; border-radius:10px; cursor:pointer; background:#8A1E1E; color:#F7F2EC; transition:background 0.2s; }
+    .bid-button:hover { background:#B22222; }
+    /* Modal styles */
+    .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); align-items:center; justify-content:center; z-index:10; }
+    .modal-content { background:#F7F2EC; color:#0D1B2A; padding:20px; border-radius:20px; width:90%; max-width:400px; text-align:center; position:relative; }
+    .close { position:absolute; top:10px; right:15px; font-size:1.5rem; cursor:pointer; }
+    input { padding:10px; border-radius:10px; border:none; margin-bottom:10px; width:80%; }
+    button { padding:10px; border-radius:10px; border:none; font-size:1rem; cursor:pointer; }
+</style>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+<header>Live Bidding Board</header>
+<div class="lot-grid" id="lotGrid"></div>
+
+<!-- Bid Modal -->
+<div class="modal" id="bidModal">
+    <div class="modal-content">
+        <span class="close" id="closeModal">&times;</span>
+        <h2 id="modalLotTitle"></h2>
+        <p>Current Bid: $<span id="modalCurrentBid"></span></p>
+        <input type="text" id="bidderName" placeholder="Your Name">
+        <input type="text" id="bidderPhone" placeholder="Last 4 Digits of Phone">
+        <input type="number" id="bidAmount" placeholder="Enter Your Bid">
+        <button id="submitBidBtn" class="bid-button">Submit Bid</button>
+        <p id="bidError" style="color:red;"></p>
+    </div>
+</div>
+
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyCquC_ZsPf59yGnlFLzK8Du1mgibvKOK_M",
+    authDomain: "biddingapp-a6d8e.firebaseapp.com",
+    projectId: "biddingapp-a6d8e",
+    storageBucket: "biddingapp-a6d8e.firebasestorage.app",
+    messagingSenderId: "870014358891",
+    appId: "1:870014358891:web:b74cf577dfd38eff46e82e",
+    measurementId: "G-0QWG9DQCLG"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+let currentSaleId = "demoSale"; // You can dynamically set this
+const lotGrid = document.getElementById("lotGrid");
+
+// Modal elements
+const bidModal = document.getElementById("bidModal");
+const closeModal = document.getElementById("closeModal");
+const modalLotTitle = document.getElementById("modalLotTitle");
+const modalCurrentBid = document.getElementById("modalCurrentBid");
+const bidderNameInput = document.getElementById("bidderName");
+const bidderPhoneInput = document.getElementById("bidderPhone");
+const bidAmountInput = document.getElementById("bidAmount");
+const submitBidBtn = document.getElementById("submitBidBtn");
+const bidError = document.getElementById("bidError");
+
+let selectedLotId = null;
+let currentLotData = null;
+
+// Show modal
+function openBidModal(lotId, lotData) {
+    selectedLotId = lotId;
+    currentLotData = lotData;
+    modalLotTitle.textContent = lotData.title;
+    modalCurrentBid.textContent = lotData.currentBid || lotData.startPrice;
+    bidAmountInput.value = '';
+    bidderNameInput.value = '';
+    bidderPhoneInput.value = '';
+    bidError.textContent = '';
+    bidModal.style.display = "flex";
+}
+
+// Close modal
+closeModal.onclick = () => bidModal.style.display = "none";
+window.onclick = e => { if (e.target == bidModal) bidModal.style.display = "none"; };
+
+// Render lots
+function renderLots(lots) {
+    lotGrid.innerHTML = "";
+    lots.forEach(doc => {
+        const lot = doc.data();
+        const div = document.createElement("div");
+        div.className = "lot-card";
+        div.innerHTML = `
+            <h3>${lot.title}</h3>
+            <p>Current Bid: $${lot.currentBid || lot.startPrice}</p>
+            <p>Bidder: ${lot.currentBidder || "—"}</p>
+            <button class="bid-button">Bid on me!</button>
+        `;
+        const btn = div.querySelector("button");
+        btn.onclick = () => openBidModal(doc.id, lot);
+        lotGrid.appendChild(div);
+    });
+}
+
+// Listen to real-time updates
+db.collection("sales").doc(currentSaleId).collection("lots")
+  .onSnapshot(snapshot => {
+      const lots = [];
+      snapshot.forEach(doc => {
+          lots.push({ id: doc.id, ...doc.data() });
+      });
+      renderLots(lots);
+  });
+
+// Submit bid
+submitBidBtn.onclick = async () => {
+    const name = bidderNameInput.value.trim();
+    const phone = bidderPhoneInput.value.trim();
+    const bidAmount = Number(bidAmountInput.value);
+
+    if (!name || !phone || !bidAmount) {
+        bidError.textContent = "Fill all fields.";
+        return;
+    }
+
+    const minIncrement = 50; // Example increment; can be dynamic
+    const currentBid = currentLotData.currentBid || currentLotData.startPrice;
+
+    if (bidAmount <= currentBid || ((bidAmount - currentBid) % minIncrement !== 0)) {
+        bidError.textContent = `Bid must be above current bid and in $${minIncrement} increments.`;
+        return;
+    }
+
+    try {
+        const lotRef = db.collection("sales").doc(currentSaleId).collection("lots").doc(selectedLotId);
+        await db.runTransaction(async transaction => {
+            const lotDoc = await transaction.get(lotRef);
+            const latestBid = lotDoc.data().currentBid || lotDoc.data().startPrice;
+            if (bidAmount <= latestBid) throw "Bid too low.";
+            transaction.update(lotRef, {
+                currentBid: bidAmount,
+                currentBidder: `${name} (${phone})`,
+                lastBidTime: Date.now()
+            });
+        });
+        bidModal.style.display = "none";
+    } catch (err) {
+        bidError.textContent = err;
+    }
+};
+</script>
+</body>
+</html>
