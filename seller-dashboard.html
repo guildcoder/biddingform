@@ -88,12 +88,6 @@ document.getElementById('signout').addEventListener('click', ()=>{
   sessionStorage.removeItem('sellerAuth'); location.href='seller-login.html';
 });
 
-async function uploadBanner(file){
-  if(!file) return '';
-  const path = `sales/banners/${Date.now()}_${file.name}`;
-  const ref = storage.ref(path);
-  await ref.put(file);
-  return await ref.getDownloadURL();
 }
 
 document.getElementById('createSaleBtn').addEventListener('click', async ()=>{
@@ -110,7 +104,6 @@ document.getElementById('createSaleBtn').addEventListener('click', async ()=>{
   if(!saleName || !businessName || !startDT || !endDT){ msg.textContent='Fill required fields'; return; }
   try{
     msg.textContent='Creating sale...';
-    const bannerUrl = await uploadBanner(file);
     const saleObj = {
       saleName, businessName, saleDesc, bannerUrl,
       startLocal: startDT, endLocal: endDT, startTZ, endTZ,
